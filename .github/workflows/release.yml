@@ -38,7 +38,7 @@ jobs:
           mkdir -p out/copane
           cp dist/copane LICENSE out/copane/
           tar -C out -czf copane-${{ matrix.target }}.tar.gz copane
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: copane-${{ matrix.target }}
           path: copane-${{ matrix.target }}.tar.gz
