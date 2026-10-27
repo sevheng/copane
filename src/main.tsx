@@ -47,6 +47,7 @@ import { windowFocus, windowFocused } from "./app/windowFocus"
 import pkg from "../package.json"
 import { setCmdReachable } from "./keymap/platform"
 import { showMacTip } from "./app/macTip"
+import { stateDirProblem } from "./app/stateDir"
 
 const USAGE = `Usage: copane [file|directory]   (no argument: the welcome page with recent folders; . opens this one)
        copane --upgrade        install the latest release
@@ -203,7 +204,13 @@ ws.buffers.subscribe(() => {
 onShutdown(() => ws.buffers.dispose())
 if (warning) setTimeout(() => ws.notify(warning, "warn"), 100)
 // After the terminal has answered the kitty keyboard query, so the tip knows whether ⌘ gets through.
-else setTimeout(() => void showMacTip(ws).catch(() => null), 2000).unref?.()
+// A state folder copane can't write comes first (the tip couldn't remember it was shown anyway).
+else
+  setTimeout(async () => {
+    const problem = await stateDirProblem().catch(() => null)
+    if (problem) ws.notify(problem, "error")
+    else await showMacTip(ws).catch(() => null)
+  }, 2000).unref?.()
 
 // Files changed by the AI CLI (or anything else) flow back into open buffers and the tree.
 // What the AI changes per prompt, for review and undo (Ctrl+Alt+Z).

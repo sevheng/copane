@@ -5,6 +5,9 @@ All notable changes to copane are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **A state folder copane can't write is reported.** When `~/.local/state` (or `$XDG_STATE_HOME`) isn't writable, for example a folder a `sudo` run left owned by root, recent folders, pane widths and backups of unsaved work were silently not kept. A notice at startup now says so, with the `chown` command that fixes it.
+
 ## [0.9.11] - 2026-10-24
 
 ### Added

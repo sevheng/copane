@@ -128,7 +128,7 @@ With `"ai": { "notify": "desktop" }` you also get a system notification: a Windo
 
 ## Your work is safe
 
-- **Errors don't close the editor.** An internal error shows as a notice, your unsaved changes are backed up and come back on the next start (Ctrl+Z drops them), and the details go to `~/.local/state/copane/errors.log`. A drawing error offers Ctrl+R to redraw the editor with every file as it was.
+- **Errors don't close the editor.** An internal error shows as a notice, your unsaved changes are backed up and come back on the next start (Ctrl+Z drops them), and the details go to `~/.local/state/copane/errors.log`. A drawing error offers Ctrl+R to redraw the editor with every file as it was. If copane can't write `~/.local/state/copane` (a folder left owned by root, say), a notice at startup says so and how to fix it.
 - **Saving never overwrites a change you haven't seen.** If a file changed on disk without the editor noticing (the file watcher can miss changes on WSL drives), Ctrl+S asks whether to overwrite or compare, and **Save all** lists the files that need a decision.
 - **Encodings stay intact.** Files that aren't UTF-8 aren't opened (saving would corrupt their accented characters), a UTF-8 byte-order mark is kept, and files with control characters (form feeds…) show a warning and ask before saving.
 
