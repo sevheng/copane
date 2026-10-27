@@ -29,7 +29,7 @@
     "typecheck": "tsc --noEmit",
     "format": "bun fmt src test",
     "format:check": "bun fmt --check src test",
-    "build": "bun build --compile --compile-exec-argv=--smol --minify --bytecode --format=esm --define process.env.NODE_ENV='\"production\"' src/main.tsx --outfile dist/copane",
+    "build": "bun build --compile --compile-exec-argv=--smol --minify --bytecode --format=esm --define process.env.NODE_ENV='\"production\"' --define process.env.OPENTUI_LIBC='\"glibc\"' src/main.tsx --outfile dist/copane",
     "install:cli": "sh scripts/install.sh",
     "native": "sh scripts/opentui-native.sh"
   },
