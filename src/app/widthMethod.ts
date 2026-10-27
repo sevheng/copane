@@ -6,7 +6,8 @@ import type { CliRenderer, WidthMethod } from "@opentui/core"
 // let the next run of text overwrite letters. "unicode-wide", with copane's native patch
 // (patches/opentui-native@*.patch, built by scripts/opentui-native.sh), counts them that way and
 // otherwise measures the same (emoji, CJK, ZWJ sequences); it matches Bun.stringWidth, which the
-// editor uses for columns. "wcwidth" (OPENTUI_FORCE_WCWIDTH) is left as it is.
+// editor uses for columns, except that the widest Khmer letters (ណ, ឈ...) get a spare cell so they
+// don't draw over the next letter. "wcwidth" (OPENTUI_FORCE_WCWIDTH) is left as it is.
 export function wideMarks(method: WidthMethod): WidthMethod {
   return method === "unicode" ? "unicode-wide" : method
 }

@@ -1,31 +1,94 @@
+diff --git a/packages/native/src/renderer.zig b/packages/native/src/renderer.zig
+index c52e606..61b26a8 100644
+--- a/packages/native/src/renderer.zig
++++ b/packages/native/src/renderer.zig
+@@ -3075,6 +3075,10 @@ pub const CliRenderer = struct {
+                             if (capabilities.explicit_width) {
+                                 ansi.ANSI.explicitWidthOutput(writer, graphemeWidth, bytes) catch {};
+                             } else {
++                                // Blank all of the cluster's cells first: the terminal may draw it in fewer.
++                                if (capabilities.explicit_cursor_positioning and graphemeWidth > 1) {
++                                    writer.print("\x1b[{d}X", .{graphemeWidth}) catch {};
++                                }
+                                 writer.writeAll(bytes) catch {};
+                                 if (capabilities.explicit_cursor_positioning) {
+                                     const nextX = x + graphemeWidth;
+diff --git a/packages/native/src/terminal.zig b/packages/native/src/terminal.zig
+index 621a4ee..2c731c4 100644
+--- a/packages/native/src/terminal.zig
++++ b/packages/native/src/terminal.zig
+@@ -27,7 +27,9 @@ pub const Capabilities = struct {
+     hyperlinks: bool = false,
+     osc52: bool = false,
+     notifications: bool = false,
+-    explicit_cursor_positioning: bool = false,
++    // Place the cell after every cluster: the terminal may draw a cluster in fewer cells (Khmer letters
++    // copane widens), and the cells it leaves are blanked first.
++    explicit_cursor_positioning: bool = true,
+     remote: bool = false,
+     program_status: bool = false,
+ };
 diff --git a/packages/native/src/utf8.zig b/packages/native/src/utf8.zig
-index 2077ca9..26ef3ec 100644
+index 2077ca9..ada8f82 100644
 --- a/packages/native/src/utf8.zig
 +++ b/packages/native/src/utf8.zig
-@@ -509,6 +509,9 @@ const GraphemeWidthState = struct {
+@@ -399,6 +399,14 @@ pub inline fn isCombiningMark(bytes: []const u8) bool {
+     };
+ }
+ 
++/// Khmer ឃ ញ ឈ ណ ឍ យ ល ស ហ ឤ: base letters wider than a terminal cell in Khmer fonts.
++inline fn isWideKhmer(cp: u21) bool {
++    return switch (cp) {
++        0x1783, 0x1788, 0x1789, 0x178D, 0x178E, 0x1799, 0x179B, 0x179F, 0x17A0, 0x17A4 => true,
++        else => false,
++    };
++}
++
+ /// Calculate width from east asian width property and Unicode properties
+ /// Returns -1 for control characters (they don't contribute to width)
+ inline fn eawToWidth(cp: u21, eaw: uucode.types.EastAsianWidth) i16 {
+@@ -415,6 +423,9 @@ inline fn eawToWidth(cp: u21, eaw: uucode.types.EastAsianWidth) i16 {
+     // conjoining jamo fillers U+115F and U+1160 keep their widths: they start a Hangul syllable cluster.
+     if (cp != 0x00AD and cp != 0x115F and cp != 0x1160 and uucode.get(.is_default_ignorable, cp)) return 0;
+ 
++    // Khmer letters drawn about twice a cell's width get two cells, so they don't run into their neighbours.
++    if (isWideKhmer(cp)) return 2;
++
+     // Terminals draw every other code point in one cell, text-default emoji too; VS16 widens those per grapheme.
+     return if (eaw == .fullwidth or eaw == .wide) 2 else 1;
+ }
+@@ -509,6 +520,11 @@ const GraphemeWidthState = struct {
      is_regional_indicator_pair: bool = false,
      is_emoji_modifier_base: bool = false,
      has_indic_virama: bool = false,
 +    // unicode_wide: a cluster that starts with a one-cell letter (not an emoji) adds a cell per letter and
 +    // spacing sign, as Windows Terminal and xterm.js draw it (Khmer ក្កា: 3 cells).
 +    sums_letters: bool = false,
++    // A wide Khmer letter has two cells where the terminal counts one: the next letter or sign uses the spare one.
++    spare_cell: bool = false,
      width_method: WidthMethod,
  
      /// Initialize state with the first codepoint of a grapheme cluster
-@@ -519,6 +522,7 @@ const GraphemeWidthState = struct {
+@@ -519,6 +535,8 @@ const GraphemeWidthState = struct {
              .is_regional_indicator_pair = (first_cp >= 0x1F1E6 and first_cp <= 0x1F1FF),
              .is_emoji_modifier_base = uucode.get(.grapheme_break, first_cp) == .emoji_modifier_base,
              .has_indic_virama = false,
-+            .sums_letters = width_method == .unicode_wide and first_width == 1 and uucode.get(.grapheme_break, first_cp) != .extended_pictographic,
++            .sums_letters = width_method == .unicode_wide and (first_width == 1 or isWideKhmer(first_cp)) and uucode.get(.grapheme_break, first_cp) != .extended_pictographic,
++            .spare_cell = width_method == .unicode_wide and isWideKhmer(first_cp),
              .width_method = width_method,
          };
      }
-@@ -570,7 +574,7 @@ const GraphemeWidthState = struct {
+@@ -570,7 +588,12 @@ const GraphemeWidthState = struct {
              // kitty, foot and WezTerm draw an emoji modifier sequence in two cells; Ghostty, unicode_wide's terminal, in one.
              self.width = 2;
          } else if (self.width_method == .unicode_wide and self.has_width and !uucode.get(.wcwidth_zero_in_grapheme, cp)) {
 -            self.width = @max(self.width, 2);
-+            self.width = if (self.sums_letters) self.width + @max(cp_width, 1) else @max(self.width, 2);
++            // A wide Khmer letter after a coeng is a small subscript: one cell.
++            if (self.sums_letters and self.spare_cell) {
++                self.spare_cell = false;
++            } else {
++                self.width = if (self.sums_letters) self.width + (if (isWideKhmer(cp)) 1 else @max(cp_width, 1)) else @max(self.width, 2);
++            }
          } else if (self.has_width and is_spacing_mark and cp_width > 0) {
              self.width = @max(self.width, 2);
          } else if (self.has_width and self.has_indic_virama and is_devanagari_base and cp_width > 0) {

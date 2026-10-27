@@ -17,7 +17,7 @@ Human-facing docs: `README.md`; contribution process: `CONTRIBUTING.md`.
 
 copane patches OpenTUI twice; both must be re-created on an OpenTUI upgrade (or dropped once upstream has the fix):
 - `patches/@opentui%2Fcore@<version>.patch` (`bun patch`): the parser worker takes an injection's language from `#set! injection.language`.
-- `patches/opentui-native@<version>.patch` (Zig, applied to the OpenTUI repo at tag `v<version>` by `scripts/opentui-native.sh`): in `unicode-wide`, a letter cluster gets a cell per letter and spacing sign, as Windows Terminal and xterm.js draw it (Khmer `ក្កា` is 3 cells). CI and the release build it per platform.
+- `patches/opentui-native@<version>.patch` (Zig, applied to the OpenTUI repo at tag `v<version>` by `scripts/opentui-native.sh`): in `unicode-wide`, a letter cluster gets a cell per letter and spacing sign, as Windows Terminal and xterm.js draw it (Khmer `ក្កា` is 3 cells); the wide Khmer letters ឃ ញ ឈ ណ ឍ យ ល ស ហ ឤ get a spare cell that the next sign of their cluster uses (`ណ` 2, `ណា` 2), and the renderer blanks a cluster's cells and places the next cell itself (`explicit_cursor_positioning` on), since the terminal counts one. CI and the release build it per platform.
 
 ## Bun first
 
