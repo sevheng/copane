@@ -12,6 +12,7 @@ import {
   shutdown,
 } from "./app/shutdown"
 import { restoreRecovery, saveRecovery } from "./app/recovery"
+import { useWideMarks } from "./app/widthMethod"
 import { createWorkspace, WorkspaceContext } from "./app/workspace"
 import { pathArg } from "./app/args"
 import { forgetRecent, loadRecent, recordRecent } from "./app/recent"
@@ -93,6 +94,7 @@ prepareTerminal()
 installSignalHandlers()
 
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
+useWideMarks(renderer)
 registerRenderer(renderer)
 // Cmd keys only arrive from terminals that answer the kitty keyboard query (the reply comes later).
 setCmdReachable(!!renderer.capabilities?.kitty_keyboard)

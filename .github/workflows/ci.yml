@@ -18,6 +18,15 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
+      # OpenTUI's native library with copane's patch (scripts/opentui-native.sh); cached per patch.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/copane/opentui-native
+          key: opentui-native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('patches/opentui-native@*.patch', 'bun.lock') }}
+      - run: sh scripts/opentui-native.sh
       - run: bun run typecheck
       - run: bun run format:check
       - run: bun test

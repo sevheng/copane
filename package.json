@@ -30,11 +30,12 @@
     "format": "bun fmt src test",
     "format:check": "bun fmt --check src test",
     "build": "bun build --compile --compile-exec-argv=--smol --minify --bytecode --format=esm --define process.env.NODE_ENV='\"production\"' src/main.tsx --outfile dist/copane",
-    "install:cli": "sh scripts/install.sh"
+    "install:cli": "sh scripts/install.sh",
+    "native": "sh scripts/opentui-native.sh"
   },
   "dependencies": {
-    "@opentui/core": "0.6.2",
-    "@opentui/react": "0.6.2",
+    "@opentui/core": "0.7.0",
+    "@opentui/react": "0.7.0",
     "diff": "9.0.0",
     "gemoji": "8.1.0",
     "ignore": "^7.0.12",
@@ -53,6 +54,6 @@
   },
   "packageManager": "bun@1.4.4",
   "patchedDependencies": {
-    "@opentui/core@0.6.2": "patches/@opentui%2Fcore@0.6.2.patch"
+    "@opentui/core@0.7.0": "patches/@opentui%2Fcore@0.7.0.patch"
   }
 }

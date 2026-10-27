@@ -30,6 +30,15 @@ jobs:
           v=$(bun -e 'console.log(require("./package.json").version)')
           [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != package.json v$v"; exit 1; }
       - run: bun install --frozen-lockfile
+      # OpenTUI's native library with copane's patch (scripts/opentui-native.sh); cached per patch.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/copane/opentui-native
+          key: opentui-native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('patches/opentui-native@*.patch', 'bun.lock') }}
+      - run: sh scripts/opentui-native.sh
       - run: bun run build
       - name: Smoke test
         run: ./dist/copane --version

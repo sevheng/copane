@@ -14,6 +14,7 @@ BIN="$PREFIX/lib/copane/copane"
 LAUNCHER="$PREFIX/bin/copane"
 
 bun install --frozen-lockfile
+sh scripts/opentui-native.sh
 bun run build
 mkdir -p "$PREFIX/bin" "$(dirname "$BIN")"
 

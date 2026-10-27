@@ -1,0 +1,31 @@
+diff --git a/packages/native/src/utf8.zig b/packages/native/src/utf8.zig
+index 2077ca9..26ef3ec 100644
+--- a/packages/native/src/utf8.zig
++++ b/packages/native/src/utf8.zig
+@@ -509,6 +509,9 @@ const GraphemeWidthState = struct {
+     is_regional_indicator_pair: bool = false,
+     is_emoji_modifier_base: bool = false,
+     has_indic_virama: bool = false,
++    // unicode_wide: a cluster that starts with a one-cell letter (not an emoji) adds a cell per letter and
++    // spacing sign, as Windows Terminal and xterm.js draw it (Khmer ក្កា: 3 cells).
++    sums_letters: bool = false,
+     width_method: WidthMethod,
+ 
+     /// Initialize state with the first codepoint of a grapheme cluster
+@@ -519,6 +522,7 @@ const GraphemeWidthState = struct {
+             .is_regional_indicator_pair = (first_cp >= 0x1F1E6 and first_cp <= 0x1F1FF),
+             .is_emoji_modifier_base = uucode.get(.grapheme_break, first_cp) == .emoji_modifier_base,
+             .has_indic_virama = false,
++            .sums_letters = width_method == .unicode_wide and first_width == 1 and uucode.get(.grapheme_break, first_cp) != .extended_pictographic,
+             .width_method = width_method,
+         };
+     }
+@@ -570,7 +574,7 @@ const GraphemeWidthState = struct {
+             // kitty, foot and WezTerm draw an emoji modifier sequence in two cells; Ghostty, unicode_wide's terminal, in one.
+             self.width = 2;
+         } else if (self.width_method == .unicode_wide and self.has_width and !uucode.get(.wcwidth_zero_in_grapheme, cp)) {
+-            self.width = @max(self.width, 2);
++            self.width = if (self.sums_letters) self.width + @max(cp_width, 1) else @max(self.width, 2);
+         } else if (self.has_width and is_spacing_mark and cp_width > 0) {
+             self.width = @max(self.width, 2);
+         } else if (self.has_width and self.has_indic_virama and is_devanagari_base and cp_width > 0) {

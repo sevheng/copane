@@ -11,6 +11,13 @@ Human-facing docs: `README.md`; contribution process: `CONTRIBUTING.md`.
 - `bun run typecheck`: `tsc --noEmit`
 - `bun run format`: `bun fmt src test` (settings in `bunfig.toml`; CI runs `format:check`)
 - `bun run install:cli`: build the binary and install `ce` (a running `ce` then offers a restart)
+- `bun run native`: build OpenTUI's native library with `patches/opentui-native@<version>.patch` and put it in `node_modules` (needs Zig 0.16.0; cached, so quick after the first time). Run it after every `bun install` that touches OpenTUI; the Khmer cases in `test/app/widthMethod.test.ts` fail without it.
+
+## OpenTUI patches
+
+copane patches OpenTUI twice; both must be re-created on an OpenTUI upgrade (or dropped once upstream has the fix):
+- `patches/@opentui%2Fcore@<version>.patch` (`bun patch`): the parser worker takes an injection's language from `#set! injection.language`.
+- `patches/opentui-native@<version>.patch` (Zig, applied to the OpenTUI repo at tag `v<version>` by `scripts/opentui-native.sh`): in `unicode-wide`, a letter cluster gets a cell per letter and spacing sign, as Windows Terminal and xterm.js draw it (Khmer `ក្កា` is 3 cells). CI and the release build it per platform.
 
 ## Bun first
 

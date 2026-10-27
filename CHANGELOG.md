@@ -7,6 +7,10 @@ All notable changes to copane are listed here. The format follows
 
 ### Fixed
 - **A state folder copane can't write is reported.** When `~/.local/state` (or `$XDG_STATE_HOME`) isn't writable, for example a folder a `sudo` run left owned by root, recent folders, pane widths and backups of unsaved work were silently not kept. A notice at startup now says so, with the `chown` command that fixes it.
+- Khmer (and other scripts with subscript letters and spacing vowel signs) shows every letter and no longer runs past the editor into the next pane: ce now measures each letter and sign as one cell, as Windows Terminal and xterm.js draw them. This takes a patch to OpenTUI's native library; building from source now needs Zig 0.16.0 and `bun run native`.
+
+### Changed
+- OpenTUI 0.7.0: typing in big files lays out only the changed lines.
 
 ## [0.9.11] - 2026-10-24
 

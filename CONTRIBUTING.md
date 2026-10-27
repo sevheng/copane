@@ -4,12 +4,13 @@ Thanks for helping. Bug reports, ideas and pull requests are all welcome.
 
 ## Setup
 
-You need [Bun](https://bun.sh) 1.4.4 or later, git, and a Linux or macOS terminal (WSL works).
+You need [Bun](https://bun.sh) 1.4.4 or later, [Zig](https://ziglang.org/download/) 0.16.0, git, and a Linux or macOS terminal (WSL works).
 
 ```sh
 git clone https://github.com/sevheng/copane.git
 cd copane
 bun install
+bun run native       # OpenTUI's native library with copane's patch (see AGENTS.md)
 bun run dev [path]   # run from source; Ctrl+Alt+R restarts it with your changes
 ```
 

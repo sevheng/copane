@@ -69,12 +69,13 @@ Uninstall: `rm -r ~/.local/bin/copane ~/.local/bin/ce ~/.local/lib/copane`.
 
 ### From source
 
-Needs [Bun](https://bun.sh) 1.4.4 or later (`curl -fsSL https://bun.sh/install | bash`).
+Needs [Bun](https://bun.sh) 1.4.4 or later (`curl -fsSL https://bun.sh/install | bash`) and [Zig](https://ziglang.org/download/) 0.16.0 on `PATH`.
 
 ```sh
 git clone https://github.com/sevheng/copane.git
 cd copane
 bun install
+bun run native              # build OpenTUI's native library with copane's patch (once, a few minutes)
 bun run dev                 # open the current directory (or pass a file or folder)
 bun run install:cli         # build and install ~/.local/bin/copane + `ce`, plus the bundled Nerd Font
 ```
