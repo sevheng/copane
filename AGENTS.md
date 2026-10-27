@@ -68,7 +68,7 @@ Use Alt or Ctrl+Alt combinations instead, and check new bindings with a quick ke
 | `src/git/` | `repo.ts` (git commands), source control panel, blame, history, branches, hunks, merge conflicts |
 | `src/lsp/` | `LspManager.ts` (servers per language, documents, diagnostics), completion, hover, rename, references, formatting |
 | `src/ai/` | The AI pane: a pseudo-terminal running the CLI (`AgentProcess`), and sending context to it |
-| `src/keymap/` | `commands.ts` (every command, by id), `bindings.ts` (default keys per layer), `keys.ts` (key parsing) |
+| `src/keymap/` | `commands.ts` (every command, by id), `bindings.ts` (default keys per layer), `keys.ts` (key parsing), `appKeymap.ts` (routing on `@opentui/keymap`) |
 | `src/preview/` | Markdown preview (own renderer on `marked`), image tabs, GIF playback |
 | `src/config/` | Config schema (zod), loading, theme colours, VS Code settings import |
 | `src/setup/` | `--upgrade` and `--install-font` |
@@ -77,7 +77,7 @@ Use Alt or Ctrl+Alt combinations instead, and check new bindings with a quick ke
 Main flows:
 - Opening a file: `ws.buffers.open(path)` → `BufferStore` adds a buffer → `EditorPane` renders it (`BufferView`, `ImageView` or `MarkdownPreview` by `kind`).
 - The AI edits a file: `FileWatcher` → `ws.buffers.handleDiskChange(path)` → clean buffers reload (undoable), dirty ones get a conflict bar.
-- A key: `useAppKeymap` looks it up in `bindings.ts` for the focused layer, then `runCommand(ws, id)` runs `commands[id]`.
+- A key: `createAppKeymap` (`keymap/appKeymap.ts`, on OpenTUI's `@opentui/keymap` engine) matches it against the bindings of `bindings.ts`, one engine layer per focus layer (the focused one first, then global; only Quit under a dialog), then `runCommand(ws, id)` runs `commands[id]`.
 
 ## Adding a feature
 

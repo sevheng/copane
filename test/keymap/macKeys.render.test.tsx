@@ -55,3 +55,13 @@ test("Mac: the palette shows ⌘ when the terminal sends Cmd, ⌃ when it doesn'
   await h.step(() => h.keys.typeText("go to file"))
   expect(h.frame()).toContain("⌘P")
 })
+
+test("Mac: Cmd+K Cmd+C is the Ctrl+K Ctrl+C chord", async () => {
+  const h = await open("const a = 1\n")
+  h.ws.buffers.active!.textarea!.setCursor(0, 0)
+  // As a kitty-protocol terminal sends them.
+  await h.step(() => h.keys.pressKey("\x1b[107;9u"))
+  expect(h.frame()).toContain("Waiting for the second key")
+  await h.step(() => h.keys.pressKey("\x1b[99;9u"))
+  expect(text(h)).toBe("// const a = 1\n")
+})

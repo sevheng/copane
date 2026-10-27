@@ -65,3 +65,15 @@ test("Alt+1 in a merge conflict still accepts the current side", async () => {
   await h.step(() => h.keys.pressKey("1", { meta: true }))
   expect(text(h)).toBe("x\nmine\ny\n")
 })
+
+test("Ctrl+Q works under a dialog: it closes it and asks about unsaved files; other global keys don't", async () => {
+  const h = await open({ "a.ts": "a\n" })
+  h.ws.buffers.active!.textarea!.insertText("x")
+  h.ws.buffers.onContentChange(h.ws.buffers.active!.id)
+  await h.step(() => h.ws.ui.set({ modal: { kind: "recent" } }))
+  await h.step(() => h.keys.pressKey("w", { ctrl: true }))
+  expect(h.ws.buffers.list()).toHaveLength(1)
+  await h.step(() => h.keys.pressKey("q", { ctrl: true }))
+  await h.step(() => {})
+  expect(h.frame()).toContain("Unsaved changes")
+})

@@ -6,6 +6,7 @@
       "name": "copane",
       "dependencies": {
         "@opentui/core": "0.7.0",
+        "@opentui/keymap": "0.7.0",
         "@opentui/react": "0.7.0",
         "diff": "9.0.0",
         "gemoji": "8.1.0",
@@ -43,6 +44,8 @@
     "@opentui/core-win32-arm64": ["@opentui/core-win32-arm64@0.7.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-8yqBoRsDbvKl2kGX0O8t5kpnVEnbzs+2qUZlJ8sbeA3Z+73WFj36G+clUIMVxpspOu78iKXlD84NIwTxjZUPKw=="],
 
     "@opentui/core-win32-x64": ["@opentui/core-win32-x64@0.7.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OfNAX7fNFHhOiiojUkIjhVOZf+IDjpbpT5G7HrxGqhlZ+n4jITrrJzACHctteWbMUYcibieJzIIoKuLdmD5I+w=="],
+
+    "@opentui/keymap": ["@opentui/keymap@0.7.0", "", { "dependencies": { "@opentui/core": "0.7.0" }, "peerDependencies": { "@opentui/react": "0.7.0", "@opentui/solid": "0.7.0", "react": ">=19.2.0", "solid-js": "1.9.12" }, "optionalPeers": ["@opentui/react", "@opentui/solid", "react", "solid-js"] }, "sha512-2IqUnLP+SCZR7+LXRL/7/DGFyaAR6r9y16H5oQVdRTfbACxAjszOaq2iZDEzHp1HVtamQRqEfteuaLEDwmO3kg=="],
 
     "@opentui/react": ["@opentui/react@0.7.0", "", { "dependencies": { "@opentui/core": "0.7.0", "react-reconciler": "^0.33.0" }, "peerDependencies": { "react": ">=19.2.0", "react-devtools-core": "^7.0.1", "ws": "^8.18.0" } }, "sha512-7/6pusatYg+MvCjAVNwu6KKMxz5SkPS5eU/8qF+hHrKUQQZfAjo2ThssE9zzfjPp9+61GAve6wDKbUfq0kwtIQ=="],
 
