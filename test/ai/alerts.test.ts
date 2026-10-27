@@ -87,7 +87,7 @@ test("system notification commands per platform", () => {
     'display notification "say \\"hi\\"" with title "copane"',
   ])
   expect(notifyCommand("copane", "done", "linux", all)).toEqual(["notify-send", "copane", "done"])
-  // Nothing installed: the caller falls back to the terminal's own notification (OSC 9).
+  // Nothing installed: the caller falls back to the terminal's own notification (the renderer's).
   expect(notifyCommand("copane", "done", "linux", () => false)).toBeNull()
   let out = ""
   ringBell((s) => (out += s))

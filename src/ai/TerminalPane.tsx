@@ -484,7 +484,7 @@ const AgentSession = memo(function AgentSession({
       const hint = toReview ? ` · ${toReview} file${toReview === 1 ? "" : "s"} to review (Ctrl+Alt+V)` : " (Ctrl+J to look)"
       ws.notify(text + hint, what === "waiting" ? "warn" : "info")
       ringBell()
-      if (how === "desktop") desktopNotify("copane", text)
+      if (how === "desktop") desktopNotify("copane", text, (m, t) => renderer.triggerNotification(m, t))
     })
     // The watch only needs ticks while a stretch of output awaits its verdict.
     let ticker: ReturnType<typeof setInterval> | null = null

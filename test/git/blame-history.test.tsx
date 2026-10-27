@@ -77,10 +77,10 @@ test("status bar shows blame for the cursor line; history and commit views open"
   // Ctrl+Alt+G (Ctrl+Alt+H would arrive as Alt+Backspace in terminals).
   await h.step(() => h!.keys.pressKey("g", { ctrl: true, meta: true }))
   await until(() => h!.frame().includes("History: a.ts (2)"))
-  await until(() => h!.frame().includes("+TWO"))
+  await until(() => /\+ +TWO/.test(h!.frame()))
   const f = h.frame()
   expect(f.indexOf("Shout line two")).toBeLessThan(f.indexOf("Start the file"))
-  expect(f).toContain("+TWO")
+  expect(f).toMatch(/\+ +TWO/)
 }, 20_000)
 
 test("blames of one file run one at a time; one replaced by a newer request is skipped", async () => {

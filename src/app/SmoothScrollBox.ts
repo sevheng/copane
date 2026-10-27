@@ -4,7 +4,7 @@ import { Glide } from "./glide"
 
 /** A scrollbox whose wheel scrolling glides (see Glide) instead of jumping a few lines at once. */
 export class SmoothScrollBoxRenderable extends ScrollBoxRenderable {
-  readonly glide = new Glide()
+  readonly glide = new Glide(true, 16, this._ctx)
 
   set smooth(on: boolean) {
     this.glide.enabled = on

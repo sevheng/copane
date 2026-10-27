@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import { basename, dirname } from "node:path"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
-import type { TextareaRenderable } from "@opentui/core"
+import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
 import { HoverBox, Modal } from "../app/Modal"
 import { useUi, useWorkspace, type Workspace, useCursorStyle } from "../app/workspace"
-import { ui as colors } from "../config/theme"
+import { diffColors, ui as colors } from "../config/theme"
+import { filetypeOf } from "../editor/grammars"
+import { useSyntaxStyle } from "../editor/syntaxStyle"
 import { openAt } from "../app/navHistory"
 import type { StatusEntry } from "./repo"
 import { sendChangesForReview } from "../ai/askAi"
@@ -56,46 +58,33 @@ const LETTER = (e: StatusEntry, section: Section) => {
 }
 const letterColor = (l: string) => (l === "M" ? colors.warn : l === "D" || l === "!" ? colors.error : colors.ok)
 
-export interface DiffLine {
-  text: string
-  color: string
-  line: number | null
-}
-
-export function colorDiff(raw: string): DiffLine[] {
-  const out: DiffLine[] = []
+/** The 0-based line of the first added line in a diff (where Enter opens the file), or 0. */
+export function firstAddedLine(raw: string): number {
   let n = 0
   for (const l of raw.split("\n")) {
     const h = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(l)
-    if (h) {
-      n = Number(h[1]) - 1
-      out.push({ text: l, color: colors.accent, line: n })
-    } else if (l.startsWith("+")) out.push({ text: l, color: colors.gitAdd, line: n++ })
-    else if (l.startsWith("-")) out.push({ text: l, color: colors.gitDel, line: null })
-    else if (l.startsWith("\\")) continue
-    else out.push({ text: l, color: colors.dim, line: l ? n++ : null })
+    if (h) n = Number(h[1]) - 1
+    else if (l.startsWith("+")) return n
+    else if (l.startsWith(" ")) n++
   }
-  while (out.length && !out.at(-1)!.text) out.pop()
-  return out
+  return 0
 }
 
-/** The hunks of a diff: their text (for `git apply`) and the row of their @@ line in `colorDiff`. */
-export function diffHunks(raw: string): { text: string; row: number }[] {
-  const out: { text: string; row: number }[] = []
-  let row = 0
+/** The hunks of a diff: their text (for `git apply`). */
+export function diffHunks(raw: string): { text: string }[] {
+  const out: { text: string }[] = []
   let cur: string[] | null = null
   for (const l of raw.split("\n")) {
     if (l.startsWith("@@")) {
       if (cur) out.at(-1)!.text = cur.join("\n")
       cur = [l]
-      out.push({ text: "", row })
+      out.push({ text: "" })
     } else if (cur && /^([ +\-\\]|$)/.test(l)) cur.push(l)
     else if (cur) {
       // Not diff content (the "diff cut" note): the hunk ends here.
       out.at(-1)!.text = cur.join("\n")
       cur = null
     }
-    if (!l.startsWith("\\")) row++
   }
   if (cur) out.at(-1)!.text = cur.join("\n").replace(/\n+$/, "")
   return out
@@ -178,7 +167,8 @@ export function SourceControlPanel() {
   const [inputKey, setInputKey] = useState(0)
   const [confirm, setConfirm] = useState<{ text: string; yes: () => void } | null>(null)
   const [rawDiff, setRawDiff] = useState("")
-  const [top, setTop] = useState(0)
+  const diffBox = useRef<ScrollBoxRenderable | null>(null)
+  const syntaxStyle = useSyntaxStyle()
   const [hunkSel, setHunkSel] = useState(0)
   const [stats, setStats] = useState<{
     staged: Map<string, { add: number; del: number }>
@@ -229,7 +219,7 @@ export function SourceControlPanel() {
   // Diff of the selected entry.
   useEffect(() => {
     let live = true
-    setTop(0)
+    if (diffBox.current) diffBox.current.scrollTop = 0
     setHunkSel(0)
     if (!row || !repo) return setRawDiff("")
     const staged = row.section === "staged"
@@ -258,8 +248,15 @@ export function SourceControlPanel() {
     }
   }, [snap, repo])
 
-  const diff = colorDiff(rawDiff)
   const hunks = diffHunks(rawDiff)
+  // The diff pane: each hunk is its @@ line, then a <diff> with a row per line ("\ No newline" has none).
+  const hunkTops: number[] = []
+  for (let r = 0, i = 0; i < hunks.length; i++) {
+    hunkTops.push(r)
+    r += hunks[i]!.text.split("\n").filter((l) => !l.startsWith("\\")).length
+  }
+  // Lines that aren't hunks: what git says instead (a binary or too big file), or the "diff cut" note.
+  const notes = rawDiff.split("\n").filter((l) => (hunks.length ? l.startsWith("… diff cut") : l !== ""))
 
   const close = () => closeModal(ws)
   const showRepo = (i: number) => {
@@ -398,8 +395,7 @@ export function SourceControlPanel() {
   }
   const open = (r: Row | undefined) => {
     if (!r) return
-    const first = diff.find((d) => d.color === colors.gitAdd)?.line ?? 0
-    void openAt(ws, r.entry.path, first, 0, 0)
+    void openAt(ws, r.entry.path, firstAddedLine(rawDiff), 0, 0)
   }
 
   // One hunk of the diff: stage or unstage it, or discard it from the file.
@@ -496,13 +492,13 @@ export function SourceControlPanel() {
   ]
   const listH = Math.max(3, innerH - (1 + msgLines + 1 + wrappedRows(buttons, leftW) + 1))
   const viewH = Math.max(3, innerH - 1)
-  const maxTop = Math.max(0, diff.length - viewH)
+  const scrollDiff = (rows: number) => diffBox.current?.scrollBy(rows)
 
   const gotoHunk = (d: 1 | -1) => {
     if (!hunks.length) return
     const i = Math.max(0, Math.min(hunks.length - 1, hunkSel + d))
     setHunkSel(i)
-    setTop(Math.max(0, Math.min(maxTop, hunks[i]!.row - 1)))
+    if (diffBox.current) diffBox.current.scrollTop = Math.max(0, hunkTops[i]! - 1)
   }
 
   useKeyboard((key) => {
@@ -559,9 +555,9 @@ export function SourceControlPanel() {
         case "return":
           return open(row)
         case "pagedown":
-          return setTop((t) => Math.min(maxTop, t + viewH - 2))
+          return scrollDiff(viewH - 2)
         case "pageup":
-          return setTop((t) => Math.max(0, t - viewH + 2))
+          return scrollDiff(-(viewH - 2))
       }
       return
     }
@@ -619,10 +615,10 @@ export function SourceControlPanel() {
         showRepo(all.indexOf(git!) + (key.shift ? -1 : 1))
         break
       case "pagedown":
-        setTop((t) => Math.min(maxTop, t + viewH - 2))
+        scrollDiff(viewH - 2)
         break
       case "pageup":
-        setTop((t) => Math.max(0, t - viewH + 2))
+        scrollDiff(-(viewH - 2))
         break
     }
   })
@@ -843,16 +839,7 @@ export function SourceControlPanel() {
             body
           )}
         </box>
-        <box
-          flexGrow={1}
-          flexDirection="column"
-          overflow="hidden"
-          onMouseDown={() => hunks.length && setFocus("diff")}
-          onMouseScroll={(e) => {
-            e.stopPropagation()
-            setTop((t) => Math.max(0, Math.min(maxTop, t + (e.scroll?.direction === "up" ? -3 : 3))))
-          }}
-        >
+        <box flexGrow={1} flexDirection="column" overflow="hidden" onMouseDown={() => hunks.length && setFocus("diff")}>
           <box height={1} flexShrink={0} overflow="hidden">
             {row ? (
               <text selectable={false} wrapMode="none" truncate fg={focus === "diff" ? colors.accent : colors.headerFg}>
@@ -866,19 +853,41 @@ export function SourceControlPanel() {
               </text>
             ) : null}
           </box>
-          {diff.slice(top, top + viewH).map((d, i) => {
-            const at = top + i
-            const h = hunks[hunkSel]
-            const next = hunks[hunkSel + 1]
-            const inHunk = focus === "diff" && h !== undefined && at >= h.row && (next === undefined || at < next.row)
-            return (
-              <box key={at} height={1} overflow="hidden" backgroundColor={inHunk ? colors.segmentBg : undefined}>
-                <text selectable={false} wrapMode="none" fg={d.color}>
-                  {d.text || " "}
+          <scrollbox ref={diffBox} flexGrow={1}>
+            {hunks.length
+              ? hunks.map((h, i) => {
+                  const sel = focus === "diff" && i === hunkSel
+                  const head = h.text.split("\n", 1)[0]
+                  return (
+                    <box key={i} flexDirection="column" flexShrink={0}>
+                      <box height={1} overflow="hidden" backgroundColor={sel ? colors.segmentBg : undefined}>
+                        <text selectable={false} wrapMode="none" fg={colors.accent}>
+                          {head}
+                          {sel ? " ◂" : ""}
+                        </text>
+                      </box>
+                      <diff
+                        diff={`--- a/${row?.entry.rel}\n+++ b/${row?.entry.rel}\n${h.text}\n`}
+                        view="unified"
+                        filetype={row ? filetypeOf(row.entry.path) : undefined}
+                        syntaxStyle={syntaxStyle}
+                        wrapMode="none"
+                        {...diffColors}
+                        contextBg={sel ? colors.segmentBg : colors.panelBg}
+                        lineNumberBg={sel ? colors.segmentBg : colors.panelBg}
+                      />
+                    </box>
+                  )
+                })
+              : null}
+            {notes.map((l, i) => (
+              <box key={`n${i}`} height={1} overflow="hidden" flexShrink={0}>
+                <text selectable={false} wrapMode="none" fg={colors.dim}>
+                  {l}
                 </text>
               </box>
-            )
-          })}
+            ))}
+          </scrollbox>
         </box>
       </box>
       <box height={1} flexDirection="row" overflow="hidden">

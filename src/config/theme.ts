@@ -95,6 +95,9 @@ export const ui = {
   gitMod: claude.amber,
   gitDel: claude.rose,
   reloadBg: "#1e3322",
+  /** Added and removed lines in a diff view (<diff>). */
+  diffAddedBg: "#1e3322",
+  diffRemovedBg: "#3a1e22",
   // Blame: after the cursor's line, and the file blame column (Alt+B)
   inlineBlame: "#5f5f5f",
   blameColumnBg: "#151515",
@@ -131,4 +134,18 @@ export const ui = {
   mdImportant: claude.purple,
   mdWarning: claude.amber,
   mdCaution: claude.rose,
+}
+
+/** Colours for OpenTUI's <diff> (spread into its props). */
+export const diffColors = {
+  fg: ui.text,
+  addedBg: ui.diffAddedBg,
+  removedBg: ui.diffRemovedBg,
+  contextBg: ui.panelBg,
+  addedSignColor: ui.gitAdd,
+  removedSignColor: ui.gitDel,
+  lineNumberFg: ui.dim,
+  lineNumberBg: ui.panelBg,
+  addedLineNumberBg: ui.diffAddedBg,
+  removedLineNumberBg: ui.diffRemovedBg,
 }

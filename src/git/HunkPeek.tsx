@@ -2,8 +2,10 @@ import { useEffect, useState, useSyncExternalStore } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { HoverBox } from "../app/Modal"
 import { useUi, useWorkspace } from "../app/workspace"
-import { ui as colors } from "../config/theme"
+import { diffColors, ui as colors } from "../config/theme"
 import type { CodeEditorRenderable } from "../editor/CodeEditorRenderable"
+import { hunkPatch } from "../editor/hunks"
+import { useSyntaxStyle } from "../editor/syntaxStyle"
 import { acceptAiChangeAt, aiHunkContext, gotoAiChange, undoAiChangeAt, type AiHunkContext } from "../ai/review"
 import { gotoChange, hunkContext, revertHunkAt, stageHunk, type HunkContext } from "./hunkActions"
 
@@ -19,6 +21,7 @@ export function HunkPeek() {
   const ws = useWorkspace()
   const ui = useUi()
   const dims = useTerminalDimensions()
+  const syntaxStyle = useSyntaxStyle()
   const peek = ui.hunkPeek
   const ai = peek?.kind === "ai"
   const [ctx, setCtx] = useState<HunkContext | AiHunkContext | null>(null)
@@ -103,12 +106,16 @@ export function HunkPeek() {
   const ed = ws.buffers.active?.textarea as CodeEditorRenderable | null | undefined
   if (!peek || !ctx || !ed) return null
   const h = ctx.hunk
-  const lines = [...h.removed.map((t) => ({ t, add: false })), ...h.added.map((t) => ({ t, add: true }))]
-  const shown = lines.slice(0, MAX_LINES)
+  const total = h.removed.length + h.added.length
+  // The first MAX_LINES lines: removed ones first, as the diff shows them.
+  const removed = h.removed.slice(0, MAX_LINES)
+  const added = h.added.slice(0, MAX_LINES - removed.length)
+  const shown = { ...h, removed, added, oldLines: removed.length, newLines: added.length }
+  const buf = ws.buffers.active!
   const lastRow = h.newStart + Math.max(1, h.newLines) - 1
   const anchor = ed.rowScreenY(Math.min(lastRow, ed.lineCount - 1)) ?? ed.y
   // Top and bottom border, the header row, the lines, and the "more" note.
-  const height = shown.length + 3 + (lines.length > MAX_LINES ? 1 : 0)
+  const height = removed.length + added.length + 3 + (total > MAX_LINES ? 1 : 0)
   const below = anchor + 1 + height <= dims.height - 1
   const top = below ? anchor + 1 : Math.max(0, anchor - height - Math.max(0, h.newLines - 1))
   const idx = ctx.all.indexOf(h) + 1
@@ -143,16 +150,17 @@ export function HunkPeek() {
         {btn("↓", () => void step(1))}
         {btn("Esc", close)}
       </box>
-      {shown.map((l, i) => (
-        <box key={i} height={1} overflow="hidden" paddingLeft={1}>
-          <text selectable={false} fg={l.add ? colors.gitAdd : colors.gitDel}>
-            {(l.add ? "+ " : "- ") + l.t}
-          </text>
-        </box>
-      ))}
-      {lines.length > MAX_LINES ? (
+      <diff
+        diff={hunkPatch(shown, buf.relPath)}
+        view="unified"
+        filetype={buf.filetype}
+        syntaxStyle={syntaxStyle}
+        wrapMode="none"
+        {...diffColors}
+      />
+      {total > MAX_LINES ? (
         <text selectable={false} fg={colors.dim}>
-          {` … ${lines.length - MAX_LINES} more lines`}
+          {` … ${total - MAX_LINES} more lines`}
         </text>
       ) : null}
     </box>

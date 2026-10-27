@@ -29,18 +29,15 @@ export function installPerfLog(renderer: CliRenderer): void {
   renderer.keyInput.on("keypress", (k: { name: string }) => {
     pendingKey ??= { name: k.name, at: performance.now() }
   })
+  // "frame" comes once a frame is drawn: the key's time ends there.
+  renderer.on("frame", () => {
+    if (!pendingKey) return
+    writer.write(`key ${pendingKey.name} ${(performance.now() - pendingKey.at).toFixed(1)}ms\n`)
+    writer.flush()
+    pendingKey = null
+  })
   renderer.setFrameCallback(async (deltaMs: number) => {
-    const now = performance.now()
-    if (pendingKey) {
-      // The frame callback runs before the frame is drawn; finish timing on the next tick.
-      const key = pendingKey
-      pendingKey = null
-      setTimeout(() => {
-        writer.write(`key ${key.name} ${(performance.now() - key.at).toFixed(1)}ms\n`)
-        writer.flush()
-      }, 0)
-    }
-    if (deltaMs > 50) writer.write(`gap ${deltaMs.toFixed(1)}ms at ${now.toFixed(0)}\n`)
+    if (deltaMs > 50) writer.write(`gap ${deltaMs.toFixed(1)}ms at ${performance.now().toFixed(0)}\n`)
   })
 }
 

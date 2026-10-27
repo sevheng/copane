@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { applyHunk, hunkAt, hunks, nextHunk, revertHunk } from "../../src/editor/hunks"
+import { applyHunk, hunkAt, hunkPatch, hunks, nextHunk, revertHunk } from "../../src/editor/hunks"
+import { parsePatch } from "diff"
 
 const base = "a\nb\nc\nd\ne\nf\n"
 const current = "a\nB\nc\nd\nnew\ne\n" // b→B, insert "new" before e, delete f
@@ -28,4 +29,13 @@ test("revert one hunk; stage one hunk", () => {
   expect(applyHunk(base, hs[0]!)).toBe("a\nB\nc\nd\ne\nf\n")
   // Index positions stay valid for later hunks too (oldStart is in base coordinates).
   expect(applyHunk(base, hs[1]!)).toBe("a\nb\nc\nd\nnew\ne\nf\n")
+})
+
+test("hunkPatch: each hunk as a unified patch with the right line numbers", () => {
+  const [changed, inserted, deleted] = hunks(base, current)
+  expect(hunkPatch(changed!, "f.txt")).toBe("--- a/f.txt\n+++ b/f.txt\n@@ -2,1 +2,1 @@\n-b\n+B\n")
+  // No old lines: the range names the line before the insert (d, line 4).
+  expect(hunkPatch(inserted!, "f.txt")).toContain("@@ -4,0 +5,1 @@\n+new\n")
+  expect(hunkPatch(deleted!, "f.txt")).toContain("@@ -6,1 +6,0 @@\n-f\n")
+  for (const h of [changed!, inserted!, deleted!]) expect(parsePatch(hunkPatch(h, "f.txt"))[0]!.hunks).toHaveLength(1)
 })

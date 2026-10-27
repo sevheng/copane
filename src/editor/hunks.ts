@@ -66,3 +66,17 @@ export function applyHunk(base: string, h: Hunk): string {
   lines.splice(h.oldStart, h.oldLines, ...h.added)
   return lines.join("\n")
 }
+
+/** One hunk as a unified patch, without context (for OpenTUI's <diff>). */
+export function hunkPatch(h: Hunk, path: string): string {
+  // A side with no lines names the line before the change (unified diff convention).
+  const range = (start: number, n: number) => `${n ? start + 1 : start},${n}`
+  return [
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    `@@ -${range(h.oldStart, h.oldLines)} +${range(h.newStart, h.newLines)} @@`,
+    ...h.removed.map((l) => `-${l}`),
+    ...h.added.map((l) => `+${l}`),
+    "",
+  ].join("\n")
+}

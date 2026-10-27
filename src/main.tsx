@@ -93,7 +93,12 @@ const { config, warning } = await loadConfig()
 prepareTerminal()
 installSignalHandlers()
 
-const renderer = await createCliRenderer({ exitOnCtrlC: false })
+// SIGINT, SIGTERM and SIGHUP run copane's shutdown (installSignalHandlers), which saves work and then
+// destroys the renderer: OpenTUI must not destroy it first. It keeps the signals copane doesn't handle.
+const renderer = await createCliRenderer({
+  exitOnCtrlC: false,
+  exitSignals: ["SIGQUIT", "SIGABRT", "SIGPIPE", "SIGBREAK", "SIGBUS"],
+})
 useWideMarks(renderer)
 registerRenderer(renderer)
 // Cmd keys only arrive from terminals that answer the kitty keyboard query (the reply comes later).

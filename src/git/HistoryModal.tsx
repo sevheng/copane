@@ -1,13 +1,34 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import type { ScrollBoxRenderable } from "@opentui/core"
 import { openFile } from "../app/navHistory"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { Modal } from "../app/Modal"
 import { useWorkspace } from "../app/workspace"
-import { ui as colors } from "../config/theme"
+import { diffColors, ui as colors } from "../config/theme"
 import type { LogEntry } from "./repo"
 import { shortAgo } from "./blame"
 import { clipCols } from "../editor/CodeEditorRenderable"
 import { closeModal } from "../app/modalStack"
+import { filetypeOf } from "../editor/grammars"
+import { useSyntaxStyle } from "../editor/syntaxStyle"
+
+/** `git show` output: the header (commit, author, message, stat), then one part per file. */
+export function splitShow(out: string): { header: string[]; files: { path: string; patch: string; info: string[] }[] } {
+  const at = out.search(/^diff --git /m)
+  const header = (at < 0 ? out : out.slice(0, at)).replace(/\n+$/, "").split("\n")
+  const files = at < 0 ? [] : out.slice(at).split(/^(?=diff --git )/m)
+  return {
+    header,
+    files: files.map((part) => {
+      const lines = part.replace(/\n+$/, "").split("\n")
+      const path = lines[0]!.match(/^diff --git a\/.* b\/(.*)$/)?.[1] ?? lines[0]!
+      const hunk = lines.findIndex((l) => l.startsWith("@@"))
+      // No hunks (binary, a rename, a mode change): git's own lines say what changed.
+      const info = (hunk < 0 ? lines.slice(1) : []).filter((l) => !l.startsWith("index "))
+      return { path, patch: hunk < 0 ? "" : part, info }
+    }),
+  }
+}
 
 /**
  * File history (commits touching a file, with that file's diff per commit) or a single
@@ -20,8 +41,9 @@ export function HistoryModal({ path, sha }: { path: string | null; sha?: string 
   const repo = (path ? ws.git?.for(path)?.repo : ws.git?.repo) ?? null
   const [commits, setCommits] = useState<LogEntry[] | null>(null)
   const [sel, setSel] = useState(0)
-  const [diff, setDiff] = useState<string[]>([])
-  const [top, setTop] = useState(0)
+  const [shown, setShown] = useState<ReturnType<typeof splitShow>>({ header: [], files: [] })
+  const box = useRef<ScrollBoxRenderable | null>(null)
+  const syntaxStyle = useSyntaxStyle()
   const close = () => closeModal(ws)
 
   useEffect(() => {
@@ -33,24 +55,23 @@ export function HistoryModal({ path, sha }: { path: string | null; sha?: string 
   const current = commits?.[sel]
   useEffect(() => {
     let live = true
-    setTop(0)
-    if (!repo || !current) return setDiff([])
-    void repo.show(current.sha, sha ? undefined : (path ?? undefined)).then((d) => live && setDiff(d.split("\n")))
+    if (box.current) box.current.scrollTop = 0
+    if (!repo || !current) return setShown({ header: [], files: [] })
+    void repo.show(current.sha, sha ? undefined : (path ?? undefined)).then((d) => live && setShown(splitShow(d)))
     return () => {
       live = false
     }
   }, [repo, current?.sha, path, sha])
 
   const viewH = Math.max(4, dims.height - 7)
-  const maxTop = Math.max(0, diff.length - viewH)
   useKeyboard((key) => {
     key.preventDefault()
     key.stopPropagation()
     if (key.name === "escape" || key.name === "q") close()
     else if (key.name === "down" || key.name === "j") setSel((s) => Math.min((commits?.length ?? 1) - 1, s + 1))
     else if (key.name === "up" || key.name === "k") setSel((s) => Math.max(0, s - 1))
-    else if (key.name === "pagedown" || key.name === "space") setTop((t) => Math.min(maxTop, t + viewH - 2))
-    else if (key.name === "pageup") setTop((t) => Math.max(0, t - viewH + 2))
+    else if (key.name === "pagedown" || key.name === "space") box.current?.scrollBy(viewH - 2)
+    else if (key.name === "pageup") box.current?.scrollBy(-(viewH - 2))
     else if (key.name === "y" && current) void ws.clipboard.copy(current.sha).then(() => ws.notify(`Copied ${current.sha}`))
     else if (key.name === "return" && path) {
       ws.ui.set({ modal: null }) // to the editor, not back to a dialog
@@ -59,17 +80,7 @@ export function HistoryModal({ path, sha }: { path: string | null; sha?: string 
   })
 
   const color = (l: string) =>
-    l.startsWith("+++") || l.startsWith("---")
-      ? colors.headerFg
-      : l.startsWith("+")
-        ? colors.gitAdd
-        : l.startsWith("-")
-          ? colors.gitDel
-          : l.startsWith("@@")
-            ? colors.accent
-            : l.startsWith("commit ") || l.startsWith("Author:") || l.startsWith("Date:")
-              ? colors.warn
-              : colors.text
+    l.startsWith("commit ") || l.startsWith("Author:") || l.startsWith("Date:") ? colors.warn : colors.text
   const w = Math.min(dims.width - 4, 170)
   const listW = sha ? 0 : Math.min(64, Math.floor(w * 0.42))
   // Who and when on each row (GitLens style), when the list has room for a subject too.
@@ -122,15 +133,7 @@ export function HistoryModal({ path, sha }: { path: string | null; sha?: string 
             )}
           </box>
         ) : null}
-        <box
-          flexGrow={1}
-          flexDirection="column"
-          overflow="hidden"
-          onMouseScroll={(e) => {
-            e.stopPropagation()
-            setTop((t) => Math.max(0, Math.min(maxTop, t + (e.scroll?.direction === "up" ? -3 : 3))))
-          }}
-        >
+        <box flexGrow={1} flexDirection="column" overflow="hidden">
           {current && !sha && current.author ? (
             <box height={1}>
               <text selectable={false} fg={colors.headerFg}>
@@ -138,13 +141,43 @@ export function HistoryModal({ path, sha }: { path: string | null; sha?: string 
               </text>
             </box>
           ) : null}
-          {diff.slice(top, top + viewH).map((l, i) => (
-            <box key={top + i} height={1} overflow="hidden">
-              <text selectable={false} wrapMode="none" fg={color(l)}>
-                {l || " "}
-              </text>
-            </box>
-          ))}
+          <scrollbox ref={box} flexGrow={1}>
+            {shown.header.map((l, i) => (
+              <box key={`h${i}`} height={1} overflow="hidden" flexShrink={0}>
+                <text selectable={false} wrapMode="none" fg={color(l)}>
+                  {l || " "}
+                </text>
+              </box>
+            ))}
+            {shown.files.map((f, i) => (
+              <box key={`f${i}`} flexDirection="column" flexShrink={0}>
+                <box height={1} />
+                <box height={1} overflow="hidden" backgroundColor={colors.segmentBg}>
+                  <text selectable={false} wrapMode="none" fg={colors.accent}>
+                    {f.path}
+                  </text>
+                </box>
+                {f.patch ? (
+                  <diff
+                    diff={f.patch}
+                    view="unified"
+                    filetype={filetypeOf(f.path)}
+                    syntaxStyle={syntaxStyle}
+                    wrapMode="none"
+                    {...diffColors}
+                  />
+                ) : (
+                  f.info.map((l, j) => (
+                    <box key={j} height={1} overflow="hidden">
+                      <text selectable={false} wrapMode="none" fg={colors.dim}>
+                        {l}
+                      </text>
+                    </box>
+                  ))
+                )}
+              </box>
+            ))}
+          </scrollbox>
         </box>
       </box>
     </Modal>

@@ -637,7 +637,7 @@ export class CodeEditorRenderable extends TextareaRenderable {
 
   // ---- smooth scrolling ----
 
-  private glider = new Glide()
+  private glider = new Glide(true, 16, this._ctx)
   /** Glide scrolls instead of jumping (editor.smoothScrolling). */
   get smoothScroll(): boolean {
     return this.glider.enabled

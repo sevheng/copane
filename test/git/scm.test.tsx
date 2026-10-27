@@ -1,3 +1,4 @@
+import { firstAddedLine } from "../../src/git/SourceControlPanel"
 import { afterEach, expect, setDefaultTimeout, test } from "bun:test"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -48,7 +49,7 @@ async function setup() {
   ws.git = GitRepos.single(git)
   h = await renderApp(ws, { tree: <text>TREE</text> })
   await h.step(() => h!.keys.pressKey("d", { ctrl: true, meta: true }))
-  await until(() => h!.frame().includes("+TWO by ai"))
+  await until(() => /\+ +TWO by ai/.test(h!.frame()))
   return { ws, root }
 }
 
@@ -58,7 +59,7 @@ test("panel lists changes with a diff; Space stages; message + Enter commits", a
   expect(f).toContain("Source control")
   expect(f).toContain("Changes (2)")
   expect(f).toContain("a.ts")
-  expect(f).toContain("+TWO by ai")
+  expect(f).toMatch(/\+ +TWO by ai/)
   // The list has focus when nothing is staged; stage a.ts.
   await h!.step(() => h!.keys.pressKey(" "))
   await until(() => h!.frame().includes("Staged (1)"))
@@ -226,6 +227,10 @@ test("in the diff, ] picks the next change and Space stages only that one", asyn
   await press("l") // into the diff, first change
   await press("]")
   await until(() => h!.frame().includes("change 2/2"))
+  // The selected change is marked and scrolled into view.
+  const marked = h!.lines().find((l) => l.includes("◂")) ?? ""
+  expect(marked).toMatch(/@@ -2\d/)
+  expect(h!.frame()).toMatch(/\+ +LINE 25/)
   await press(" ")
   await until(() => sh(root, "diff", "--cached").includes("+LINE 25"))
   const staged = sh(root, "diff", "--cached")
@@ -394,7 +399,7 @@ test("several repositories: a tab each; staging and committing act on the one sh
     await until(() => h!.frame().includes("front main"))
     // Opened from the editor: the open file's repository.
     await h.step(() => h!.keys.pressKey("d", { ctrl: true, meta: true }))
-    await until(() => h!.frame().includes("+a changed"))
+    await until(() => /\+ +a changed/.test(h!.frame()))
     expect(h.frame()).toContain("Source control  front")
     expect(h.frame()).toContain("back 1")
     await h.step(() => h!.keys.pressKey(" "))
@@ -410,7 +415,7 @@ test("several repositories: a tab each; staging and committing act on the one sh
     await h.step(() => h!.keys.pressEscape())
     await until(() => h!.frame().includes("(c or Tab to write)"))
     await h.step(() => h!.keys.pressKey("n"))
-    await until(() => h!.frame().includes("+b changed"))
+    await until(() => /\+ +b changed/.test(h!.frame()))
     expect(h.frame()).toContain("Source control  back")
   } finally {
     repos.stop()
@@ -473,4 +478,10 @@ test("the panel opened over another dialog returns to it on Escape", async () =>
   expect(ws.ui.get().modal?.kind).toBe("help")
   await h!.step(() => h!.keys.pressEscape())
   await until(() => ws.ui.get().modal === null)
+})
+
+test("firstAddedLine: Enter on a file opens at its first added line", () => {
+  expect(firstAddedLine("@@ -3,3 +3,4 @@\n a\n-b\n+B\n c")).toBe(3)
+  expect(firstAddedLine("@@ -0,0 +1,2 @@ new file\n+x\n+y")).toBe(0)
+  expect(firstAddedLine("@@ -5,2 +5,1 @@\n a\n-b")).toBe(0)
 })

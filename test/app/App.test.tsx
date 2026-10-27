@@ -8,7 +8,7 @@ import { App } from "../../src/app/App"
 import { runCommand } from "../../src/keymap/commands"
 import { configSchema } from "../../src/config/schema"
 import { createWorkspace, WorkspaceContext, type Workspace } from "../../src/app/workspace"
-import { captureFrame, editorShown } from "../helpers"
+import { captureFrame, editorShown, waitUntil } from "../helpers"
 
 let cleanup: (() => void) | null = null
 afterEach(() => {
@@ -96,6 +96,47 @@ test("conflict bar and dirty-quit modal render", async () => {
   const frame = captureFrame(setup)
   expect(frame).toContain("Unsaved changes")
   expect(frame).toContain("Save all and quit")
+})
+
+test("Compare shows yours vs disk as a diff and scrolls with the keys", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cedit-app-"))
+  const lines = Array.from({ length: 40 }, (_, i) => `const line${i} = ${i}`)
+  await writeFile(join(dir, "a.ts"), lines.join("\n") + "\n")
+  const ws = createWorkspace(dir)
+  const buf = await ws.buffers.open("a.ts")
+  const setup = await render(ws, 120, 20)
+  await Bun.sleep(50)
+  act(() => {
+    buf.textarea!.insertText("// mine\n")
+    ws.buffers.onContentChange(buf.id)
+  })
+  // Every other line changed on disk: more rows than the modal shows.
+  await writeFile(join(dir, "a.ts"), lines.map((l, i) => (i % 2 ? l : l + " // disk")).join("\n") + "\n")
+  await act(async () => {
+    await ws.buffers.handleDiskChange(join(dir, "a.ts"))
+  })
+  act(() => ws.ui.set({ modal: { kind: "diff", bufId: buf.id } }))
+  await setup.renderOnce()
+  await waitUntil(
+    () => captureFrame(setup).includes("const line0 = 0 // disk"),
+    4000,
+    () => setup.renderOnce(),
+  )
+  let f = captureFrame(setup)
+  expect(f).toContain("yours (−) vs on disk (+)")
+  expect(f).toMatch(/- *\/\/ mine/)
+  expect(f).toContain("↑↓ scroll")
+  expect(f).not.toContain("const line20 = 20 // disk")
+  await act(async () => {
+    for (let i = 0; i < 70; i++) setup.mockInput.pressArrow("down")
+  })
+  await waitUntil(
+    () => captureFrame(setup).includes("const line38 = 38 // disk"),
+    4000,
+    () => setup.renderOnce(),
+  )
+  f = captureFrame(setup)
+  expect(f).not.toContain("// mine")
 })
 
 test("Ctrl+L after Shift+Down x2 sends exactly two lines to the AI", async () => {

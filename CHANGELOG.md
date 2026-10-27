@@ -11,6 +11,10 @@ All notable changes to copane are listed here. The format follows
 
 ### Changed
 - OpenTUI 0.7.0: typing in big files lays out only the changed lines.
+- Every diff shows in OpenTUI's diff view, with syntax colours, line numbers, and added and removed lines on a coloured background: Source control, the change peek (Alt+H), file and commit history, "Compare" (a file changed on disk), the AI turns view (Ctrl+Alt+Z) and an agent's merge review. History shows each file of a commit under its own header.
+- Smooth scrolling steps with the renderer's frames instead of its own timer.
+- Closing the terminal tab or a `kill` (SIGHUP, SIGTERM) lets copane finish saving its state before the screen is restored; OpenTUI no longer tears it down first.
+- With `ai.notify: "desktop"` and no system notifier, the terminal's own notification now goes through the renderer, so it no longer mixes into a screen update and also reaches the terminal from inside tmux.
 
 ## [0.9.11] - 2026-10-24
 

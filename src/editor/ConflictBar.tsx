@@ -1,12 +1,14 @@
-import { useState } from "react"
+import { useRef } from "react"
+import type { ScrollBoxRenderable } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
-import { structuredPatch } from "diff"
+import { createPatch } from "diff"
 import { useWorkspace, type Workspace, useKeyText } from "../app/workspace"
 import { HoverBox, Modal } from "../app/Modal"
-import { ui as colors } from "../config/theme"
+import { diffColors, ui as colors } from "../config/theme"
 import type { Buffer } from "./BufferStore"
 import { acceptConflict, gotoConflict, useConflicts } from "../git/conflictActions"
 import { closeModal } from "../app/modalStack"
+import { useSyntaxStyle } from "./syntaxStyle"
 
 /** Resolve a disk/AI conflict. Each returns after updating the buffer. */
 function resolve(ws: Workspace, buf: Buffer, how: "merge" | "disk" | "mine"): void {
@@ -85,22 +87,15 @@ export function DiffModal({ bufId }: { bufId: number }) {
   const ws = useWorkspace()
   const dims = useTerminalDimensions()
   const buf = ws.buffers.byId(bufId)
-  const [top, setTop] = useState(0)
-  const lines: { text: string; color: string }[] = []
-  if (buf) {
-    const patch = structuredPatch(buf.relPath, buf.relPath, ws.buffers.textOf(buf), buf.diskText, "", "", { context: 2 })
-    for (const h of patch.hunks) {
-      lines.push({ text: `@@ line ${h.newStart} @@`, color: colors.accent })
-      for (const l of h.lines) {
-        if (l.startsWith("\\")) continue
-        lines.push({ text: l, color: l[0] === "+" ? colors.gitAdd : l[0] === "-" ? colors.gitDel : colors.dim })
-      }
-    }
-  }
+  const syntaxStyle = useSyntaxStyle()
+  const box = useRef<ScrollBoxRenderable | null>(null)
+  const patch = buf ? createPatch(buf.relPath, ws.buffers.textOf(buf), buf.diskText, "", "", { context: 2 }) : ""
+  // Rows <diff> draws: one per hunk line (not the file and hunk headers, nor "\ No newline").
+  const rows = patch.split("\n").filter((l) => /^[ +-]/.test(l) && !/^(\+\+\+|---) /.test(l)).length
   const canMerge = buf ? ws.buffers.mergePreview(buf.id) !== null : false
-  const viewH = Math.max(3, Math.min(lines.length || 1, dims.height - 9))
-  const maxTop = Math.max(0, lines.length - viewH)
-  const scroll = (d: number) => setTop((t) => Math.max(0, Math.min(maxTop, t + d)))
+  const viewH = Math.max(3, Math.min(rows || 1, dims.height - 9))
+  const scrolls = rows > viewH
+  const scroll = (d: number) => box.current?.scrollBy(d)
 
   useKeyboard((key) => {
     key.preventDefault()
@@ -123,22 +118,9 @@ export function DiffModal({ bufId }: { bufId: number }) {
       height={viewH + 6}
       onClose={() => closeModal(ws)}
     >
-      <box
-        flexDirection="column"
-        height={viewH}
-        onMouseScroll={(e) => {
-          e.stopPropagation()
-          scroll(e.scroll?.direction === "up" ? -3 : 3)
-        }}
-      >
-        {lines.slice(top, top + viewH).map((l, i) => (
-          <box key={top + i} height={1} overflow="hidden">
-            <text selectable={false} fg={l.color}>
-              {l.text || " "}
-            </text>
-          </box>
-        ))}
-      </box>
+      <scrollbox ref={box} height={viewH} flexShrink={0}>
+        <diff diff={patch} view="unified" filetype={buf.filetype} syntaxStyle={syntaxStyle} wrapMode="none" {...diffColors} />
+      </scrollbox>
       <box height={1} />
       <box flexDirection="row" gap={1} height={1}>
         {canMerge ? <Btn strong label="[m] Merge both" onPress={() => resolve(ws, buf, "merge")} /> : null}
@@ -146,7 +128,7 @@ export function DiffModal({ bufId }: { bufId: number }) {
         <Btn label="[k] Keep mine" onPress={() => resolve(ws, buf, "mine")} />
         <text selectable={false} fg={colors.dim}>
           {canMerge ? "" : "same lines changed: pick one"}
-          {maxTop ? " ↑↓ scroll" : ""}
+          {scrolls ? " ↑↓ scroll" : ""}
         </text>
       </box>
     </Modal>

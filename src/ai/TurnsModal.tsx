@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import type { ScrollBoxRenderable } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { Modal } from "../app/Modal"
 import { safely } from "../app/safely"
 import { useWorkspace } from "../app/workspace"
 import { openAt } from "../app/navHistory"
-import { ui as colors } from "../config/theme"
-import { hunks, type Hunk } from "../editor/hunks"
+import { diffColors, ui as colors } from "../config/theme"
+import { hunkPatch, hunks, type Hunk } from "../editor/hunks"
+import { filetypeOf } from "../editor/grammars"
+import { useSyntaxStyle } from "../editor/syntaxStyle"
 import { relTo, type Turn, type TurnFile } from "./turns"
 import { closeModal } from "../app/modalStack"
 
@@ -146,21 +149,7 @@ export function TurnsModal() {
     )
   }
 
-  // The changes of the selected file, as numbered blocks of removed and added lines.
-  const lines: { text: string; fg: string; bg?: string }[] = []
-  fileHunks.forEach((hk, i) => {
-    const sel = focus === "changes" && i === hi
-    lines.push({
-      text: `── change ${i + 1} · line ${hk.newStart + 1} ${sel ? "◂" : ""}`,
-      fg: colors.accent,
-      bg: sel ? colors.segmentBg : undefined,
-    })
-    for (const l of hk.removed) lines.push({ text: `- ${l}`, fg: colors.gitDel })
-    for (const l of hk.added) lines.push({ text: `+ ${l}`, fg: colors.gitAdd })
-  })
-  const firstOfSel = lines.findIndex((l) => l.text.startsWith(`── change ${hi + 1} `))
   const viewH = h - 6
-  const top = Math.max(0, Math.min(firstOfSel - 2, lines.length - viewH))
 
   return (
     <Modal
@@ -199,20 +188,20 @@ export function TurnsModal() {
           ))}
         </box>
         <box flexGrow={1} flexDirection="column">
-          {lines.length === 0 ? (
+          {fileHunks.length === 0 ? (
             <text selectable={false} fg={colors.dim}>
               {file && !file.known
                 ? "The content before this turn isn't known (binary, or ignored by git)."
                 : "No difference from before this turn (already undone?)."}
             </text>
           ) : (
-            lines.slice(top, top + viewH).map((l, i) => (
-              <box key={top + i} height={1} overflow="hidden" backgroundColor={l.bg}>
-                <text selectable={false} fg={l.fg}>
-                  {l.text || " "}
-                </text>
-              </box>
-            ))
+            <Changes
+              path={file!.path}
+              relPath={relTo(ws.root, file!.path)}
+              hunks={fileHunks}
+              selected={focus === "changes" ? hi : -1}
+              height={viewH}
+            />
           )}
         </box>
       </box>
@@ -222,5 +211,44 @@ export function TurnsModal() {
         </text>
       ) : null}
     </Modal>
+  )
+}
+
+/** A file's changes as numbered blocks, each an OpenTUI <diff>; the selected one is marked and kept in view. */
+function Changes(props: { path: string; relPath: string; hunks: Hunk[]; selected: number; height: number }) {
+  const syntaxStyle = useSyntaxStyle()
+  const box = useRef<ScrollBoxRenderable | null>(null)
+  const filetype = filetypeOf(props.path)
+  // Row where each block starts: its header, then one row per removed and added line.
+  const starts: number[] = []
+  let row = 0
+  for (const hk of props.hunks) (starts.push(row), (row += 1 + hk.removed.length + hk.added.length))
+  const target = Math.max(0, (starts[Math.max(0, props.selected)] ?? 0) - 2)
+  useEffect(() => {
+    if (box.current) box.current.scrollTop = target
+  }, [target])
+  return (
+    <scrollbox ref={box} height={props.height}>
+      {props.hunks.map((hk, i) => {
+        const sel = i === props.selected
+        return (
+          <box key={i} flexDirection="column" flexShrink={0}>
+            <box height={1} backgroundColor={sel ? colors.segmentBg : undefined}>
+              <text selectable={false} fg={colors.accent}>
+                {`── change ${i + 1} · line ${hk.newStart + 1} ${sel ? "◂" : ""}`}
+              </text>
+            </box>
+            <diff
+              diff={hunkPatch(hk, props.relPath)}
+              view="unified"
+              filetype={filetype}
+              syntaxStyle={syntaxStyle}
+              wrapMode="none"
+              {...diffColors}
+            />
+          </box>
+        )
+      })}
+    </scrollbox>
   )
 }

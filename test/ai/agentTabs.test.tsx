@@ -174,13 +174,13 @@ test("review & merge a worktree agent: its files and diffs, merge, then clean up
 
   const count = h!.find("· 3")
   await h!.step(() => h!.mouse.click(count.x + 2, count.y))
-  await until(() => h!.frame().includes("new.txt") && h!.frame().includes("+a by agent"))
+  await until(() => h!.frame().includes("new.txt") && /\+ +a by agent/.test(h!.frame()))
   const f = h!.frame()
   expect(f).toContain("Review & merge second (copane/second-1) into main")
   for (const row of ["M a.txt", "M b.txt", "A new.txt"]) expect(f).toContain(row)
-  expect(f).toContain("+a by agent") // the first file's diff
+  expect(f).toMatch(/\+ +a by agent/) // the first file's diff
   await h!.step(() => h!.keys.pressArrow("down"))
-  await until(() => h!.frame().includes("+b by agent"))
+  await until(() => /\+ +b by agent/.test(h!.frame()))
 
   await h!.step(() => h!.keys.pressKey("m"))
   await until(() => ws.ui.get().modal?.kind === "confirm")

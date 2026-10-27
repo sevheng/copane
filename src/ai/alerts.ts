@@ -125,20 +125,20 @@ export function notifyCommand(
   return null
 }
 
-/**
- * The bell, and (for "desktop") a system notification. Written straight to the terminal: BEL and
- * OSC 9 move no cursor, so they don't disturb the screen.
- */
+/** The bell, written straight to the terminal: BEL moves no cursor, so it doesn't disturb the screen. */
 export function ringBell(write: (s: string) => void = (s) => process.stdout.write(s)): void {
   write("\x07")
 }
 
-export function desktopNotify(title: string, body: string, write: (s: string) => void = (s) => process.stdout.write(s)): void {
+/**
+ * A system notification. Without a system tool, the terminal's own (iTerm2, kitty, WezTerm, Ghostty...):
+ * `terminal` is the renderer's `triggerNotification`, which picks the sequence and passes it through tmux.
+ */
+export function desktopNotify(title: string, body: string, terminal: (message: string, title: string) => boolean): void {
   const platform = isWsl() ? "wsl" : process.platform === "darwin" ? "mac" : "linux"
   const cmd = notifyCommand(title, body, platform, (c) => Bun.which(c) !== null)
   if (!cmd) {
-    // Terminals that show notifications themselves (iTerm2, kitty, WezTerm, Ghostty...).
-    write(`\x1b]9;${title}: ${body}\x07`)
+    terminal(body, title)
     return
   }
   try {

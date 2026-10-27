@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import type { ScrollBoxRenderable } from "@opentui/core"
 import { openFile } from "../app/navHistory"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { join } from "node:path"
 import { HoverBox, Modal } from "../app/Modal"
 import { useWorkspace, type Workspace } from "../app/workspace"
-import { ui as colors } from "../config/theme"
+import { diffColors, ui as colors } from "../config/theme"
 import { GitRepo, type WorktreeChange } from "../git/repo"
-import { colorDiff, type DiffLine } from "../git/SourceControlPanel"
+import { filetypeOf } from "../editor/grammars"
+import { useSyntaxStyle } from "../editor/syntaxStyle"
 import { worktreeOf } from "./TerminalPane"
 import { closeModal, openOver } from "../app/modalStack"
 
@@ -25,8 +27,9 @@ export function MergeAgentModal({ sessionId }: { sessionId: number }) {
   const [base, setBase] = useState<string | null>(null)
   const [changes, setChanges] = useState<WorktreeChange[] | null>(null)
   const [sel, setSel] = useState(0)
-  const [diff, setDiff] = useState<DiffLine[]>([])
-  const [top, setTop] = useState(0)
+  const [diff, setDiff] = useState("")
+  const box = useRef<ScrollBoxRenderable | null>(null)
+  const syntaxStyle = useSyntaxStyle()
   const [status, setStatus] = useState<{ text: string; kind: "info" | "error" | "busy" } | null>(null)
   const [confirm, setConfirm] = useState<{ text: string; yes: () => void } | null>(null)
   // Your uncommitted files the merge would overwrite (git refused): commit them, then merge again.
@@ -52,10 +55,10 @@ export function MergeAgentModal({ sessionId }: { sessionId: number }) {
   }, [sessionId, repo])
 
   useEffect(() => {
-    setTop(0)
-    if (!change || !base || !agent) return setDiff([])
+    if (box.current) box.current.scrollTop = 0
+    if (!change || !base || !agent) return setDiff("")
     let live = true
-    void agent.diffSince(base, change).then((d) => live && setDiff(colorDiff(d)))
+    void agent.diffSince(base, change).then((d) => live && setDiff(d))
     return () => {
       live = false
     }
@@ -132,7 +135,6 @@ export function MergeAgentModal({ sessionId }: { sessionId: number }) {
   }
 
   const viewH = dims.height - 8
-  const maxTop = Math.max(0, diff.length - viewH)
   useKeyboard((key) => {
     key.preventDefault()
     key.stopPropagation()
@@ -146,8 +148,8 @@ export function MergeAgentModal({ sessionId }: { sessionId: number }) {
     if (key.name === "escape") close()
     else if (key.name === "down" || key.name === "j") setSel((i) => Math.min(Math.max(0, n - 1), i + 1))
     else if (key.name === "up" || key.name === "k") setSel((i) => Math.max(0, i - 1))
-    else if (key.name === "pagedown") setTop((t) => Math.min(maxTop, t + viewH))
-    else if (key.name === "pageup") setTop((t) => Math.max(0, t - viewH))
+    else if (key.name === "pagedown") box.current?.scrollBy(viewH)
+    else if (key.name === "pageup") box.current?.scrollBy(-viewH)
     else if (key.name === "return") open()
     else if (key.name === "m" && n) void merge()
     else if (key.name === "d") discard()
@@ -222,23 +224,18 @@ export function MergeAgentModal({ sessionId }: { sessionId: number }) {
             ))
           )}
         </box>
-        <box
-          flexGrow={1}
-          flexDirection="column"
-          overflow="hidden"
-          onMouseScroll={(e) => {
-            e.stopPropagation()
-            setTop((t) => Math.max(0, Math.min(maxTop, t + (e.scroll?.direction === "up" ? -3 : 3))))
-          }}
-        >
-          {diff.slice(top, top + viewH).map((d, i) => (
-            <box key={top + i} height={1} overflow="hidden">
-              <text selectable={false} wrapMode="none" fg={d.color}>
-                {d.text || " "}
-              </text>
-            </box>
-          ))}
-        </box>
+        <scrollbox ref={box} flexGrow={1}>
+          {diff && change ? (
+            <diff
+              diff={`--- a/${change.rel}\n+++ b/${change.rel}\n${diff}`}
+              view="unified"
+              filetype={filetypeOf(change.rel)}
+              syntaxStyle={syntaxStyle}
+              wrapMode="none"
+              {...diffColors}
+            />
+          ) : null}
+        </scrollbox>
       </box>
       <box height={1} flexDirection="row" overflow="hidden">
         <text

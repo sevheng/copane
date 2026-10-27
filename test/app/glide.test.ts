@@ -38,3 +38,26 @@ test("stop ends it where it is; disabled moves at once", async () => {
   off.by(7, (k) => (moved += k))
   expect(moved).toBe(7)
 })
+
+test("on the renderer's frames: one step per frame, sized by the time since the last", () => {
+  const queue: ((dt: number) => void)[] = []
+  const frames = {
+    requestAnimationFrame: (cb: (dt: number) => void) => queue.push(cb) - 1,
+    cancelAnimationFrame: () => {},
+  }
+  const steps: number[] = []
+  new Glide(true, 16, frames).by(30, (k) => steps.push(k))
+  expect(steps).toEqual([10]) // the first step at once, as with the timer
+  queue.shift()!(32) // a 30 fps frame: two 16 ms thirds of the 20 left
+  expect(steps[1]).toBe(12) // 20 × (1 − (2/3)²) = 11.1, rounded up
+  while (queue.length) queue.shift()!(32)
+  expect(steps.reduce((a, b) => a + b, 0)).toBe(30)
+})
+
+test("no frames coming (renderer suspended): the rest moves at once", () => {
+  let pos = 0
+  const g = new Glide(true, 16, { requestAnimationFrame: () => -1, cancelAnimationFrame: () => {} })
+  g.by(30, (k) => (pos += k))
+  expect(pos).toBe(30)
+  expect(g.active).toBe(false)
+})
