@@ -150,7 +150,8 @@ test("word wrap (Alt+Z): long lines wrap, clicks and line numbers map to the rig
   const ta = ws.buffers.active!.textarea!
   expect(ta.logicalCursor.row).toBe(1)
   expect(ta.logicalCursor.col).toBeGreaterThan(20)
-  // Toggle back.
+  // Toggle back (the cursor first to the line's start: unwrapped, the view would scroll sideways to it).
+  ta.setCursor(1, 0)
   await h.step(() => h!.keys.pressKey("z", { meta: true }))
   await Bun.sleep(30)
   await h.setup.renderOnce()

@@ -128,6 +128,16 @@ function deliverCtrlClicks(ctx: RenderContext): void {
  * - Keys behave as in VS Code: Home/End work on the line (Ctrl for the file), PageUp/PageDown
  *   page, Enter keeps the indent, brackets and quotes close themselves.
  */
+export interface ScrollState {
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Content columns (0 when lines wrap) and visual lines. */
+  cols: number
+  lines: number
+}
+
 export class CodeEditorRenderable extends TextareaRenderable {
   /** Called after any mouse interaction that may have moved the cursor or selection. */
   onPointer: ((event: MouseEvent) => void) | null = null
@@ -137,6 +147,9 @@ export class CodeEditorRenderable extends TextareaRenderable {
   onHistory: (() => void) | null = null
   /** Ctrl+click (or Alt+click) on text: go to the definition at (row, col). */
   onDefinitionClick: ((row: number, col: number) => void) | null = null
+  /** The view scrolled or its size changed (called after the frame that shows it). */
+  onScroll: ((state: ScrollState) => void) | null = null
+  private lastScroll = ""
   /** Enter keeps the line's indent (`editor.autoIndent`). */
   autoIndent = true
   /** Brackets and quotes close themselves (`editor.autoClosingBrackets`). */
@@ -215,6 +228,7 @@ export class CodeEditorRenderable extends TextareaRenderable {
 
   protected override renderSelf(buffer: OptimizedBuffer): void {
     super.renderSelf(buffer)
+    this.reportScroll()
     const n = this.note
     if (!n || this.logicalCursor.row !== n.row || this.hasSelection()) return
     const info = this.visualLines()
@@ -765,6 +779,46 @@ export class CodeEditorRenderable extends TextareaRenderable {
     return this.wrapMode !== "none"
   }
 
+  /**
+   * Where the view is: its offsets and size in cells, and the content's size. The columns are
+   * the longest line on screen's (0 when lines wrap): the view can only scroll sideways where
+   * a line reaches (see scrollViewBy), so the horizontal bar shows what can be scrolled here.
+   */
+  scrollState(): ScrollState {
+    const vp = this.editorView.getViewport()
+    const lines = this.editorView.getTotalVirtualLineCount()
+    // One column past the longest line, so its end can be scrolled into view with the cursor after it.
+    const cols = this.wraps ? 0 : this.widestOnScreen(vp.offsetY, vp.height) + 1
+    return { x: vp.offsetX, y: vp.offsetY, width: vp.width, height: vp.height, cols, lines }
+  }
+
+  /** The width of the longest line among `height` visual rows from `y`. */
+  private widestOnScreen(y: number, height: number): number {
+    const widths = this.visualLines().lineWidthCols
+    let w = 0
+    for (let r = y; r < Math.min(y + height, widths.length); r++) w = Math.max(w, widths[r] ?? 0)
+    return w
+  }
+
+  private reportScroll(): void {
+    if (!this.onScroll) return
+    const s = this.scrollState()
+    const key = `${s.x}:${s.y}:${s.width}:${s.height}:${s.cols}:${s.lines}`
+    if (key === this.lastScroll) return
+    this.lastScroll = key
+    this.onScroll(s)
+  }
+
+  /** Scroll the view to column `x` and line `y` (a scrollbar's thumb), keeping the cursor where it is. */
+  scrollTo(x: number | null, y: number | null): void {
+    const vp = this.editorView.getViewport()
+    const dx = x === null ? 0 : Math.max(0, Math.round(x)) - vp.offsetX
+    const dy = y === null ? 0 : Math.max(0, Math.round(y)) - vp.offsetY
+    if (!dx && !dy) return
+    this.stopGlide()
+    this.scrollViewBy(dx, dy)
+  }
+
   /** First screen (visual) row of a file line; the same number unless lines wrap. */
   visualRowOf(row: number): number {
     if (!this.wraps) return row
@@ -830,13 +884,40 @@ export class CodeEditorRenderable extends TextareaRenderable {
     else this.scrollViewBy(vertical ? 0 : amount, vertical ? amount : 0)
   }
 
+  /**
+   * The native view keeps its cursor this many columns from the sides (its scroll margin, a
+   * fifth of the width), scrolling sideways to it on every frame otherwise.
+   */
+  private marginCols(width: number): number {
+    return Math.min(Math.max(1, Math.floor(width * 0.2)), Math.floor(Math.max(0, width - 1) / 2))
+  }
+
+  /** Whether the native view leaves offset `x` alone with its cursor at `col` (true when lines wrap: no sideways scrolling then). */
+  private holdsX(col: number, x: number, width: number): boolean {
+    if (this.wraps) return true
+    const m = this.marginCols(width)
+    return (col >= x + m && col < x + width - m) || (x === 0 && col < m)
+  }
+
+  /** Whether the native view leaves offset `y` alone with its cursor on visual row `row`. */
+  private holdsY(row: number, y: number, height: number): boolean {
+    const m = Math.min(Math.max(1, Math.floor(height * 0.2)), Math.floor(Math.max(0, height - 1) / 2))
+    if (row < y + m) return Math.max(0, row - m) === y
+    if (row >= y + height - m) {
+      const maxY = Math.max(0, this.editorView.getTotalVirtualLineCount() - height)
+      return Math.min(row + m - height + 1, maxY) === y
+    }
+    return true
+  }
+
   /** Scroll the view (not the cursor) by dx columns and dy lines, parking the cursor as needed. */
   private scrollViewBy(dx: number, dy: number): void {
     const view = this.editorView
     const vp = view.getViewport()
     const maxY = Math.max(0, view.getTotalVirtualLineCount() - vp.height)
-    const x = Math.max(0, vp.offsetX + dx)
     const y = Math.max(0, Math.min(maxY, vp.offsetY + dy))
+    const maxX = this.wraps ? 0 : Math.max(0, this.widestOnScreen(y, vp.height) + 1 - vp.width)
+    let x = Math.max(0, Math.min(maxX, vp.offsetX + dx))
     if (x === vp.offsetX && y === vp.offsetY) return this.stopGlide() // reached the top or bottom
     // With a selection the native cursor is its active end; let it ride as the native view wants.
     if (this.hasSelection()) {
@@ -846,15 +927,32 @@ export class CodeEditorRenderable extends TextareaRenderable {
     }
     const before = this.logicalCursor
     view.setViewport(x, y, vp.width, vp.height, true)
-    const now = super.logicalCursor
+    let now = super.logicalCursor
+    // Sideways, the native view moves no cursor: it would scroll back to its column on the next
+    // frame. Put it on a column that holds the view, on its row when that is long enough, else
+    // on the longest row on screen; no row reaching that far means the view can't go there.
+    if (x !== vp.offsetX && !this.holdsX(now.col, x, vp.width)) {
+      const widths = this.visualLines().lineWidthCols
+      const m = this.marginCols(vp.width)
+      let row = now.row
+      if ((widths[row] ?? 0) < x + m) {
+        for (let r = y; r < Math.min(y + vp.height, widths.length); r++) if ((widths[r] ?? 0) > (widths[row] ?? 0)) row = r
+        if ((widths[row] ?? 0) < x + m) {
+          x = Math.max(0, (widths[row] ?? 0) - m)
+          view.setViewport(x, y, vp.width, vp.height, false)
+        }
+      }
+      const col = x === 0 && now.col < m ? now.col : Math.max(x + m, Math.min(now.col, x + vp.width - m - 1, widths[row] ?? 0))
+      this.editBuffer.setCursor(row, col)
+      now = super.logicalCursor
+    }
     if (!this.parked && (now.row !== before.row || now.col !== before.col)) {
       this.parked = { row: before.row, col: before.col }
       this.showCursor = false
     } else if (this.parked) {
       // Scrolled back far enough that the native view would leave the real cursor alone.
-      const margin = Math.max(1, Math.floor(vp.height * 0.2))
       const { row, col } = this.parked
-      if (row >= y + margin && row < y + vp.height - margin) this.unpark()
+      if (this.holdsY(this.visualRowOf(row), y, vp.height) && this.holdsX(col, x, vp.width)) this.unpark()
       else if (row === now.row && col === now.col) this.dropPark()
     }
     this.requestRender()

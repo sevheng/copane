@@ -36,7 +36,8 @@ Run in a real terminal, in plain mode and inside tmux.
 17. Wheel over the editor: the view scrolls and the cursor stays put. Typing jumps back to it.
 18. Click the editor while the tree is focused, then type: the text goes into the editor.
 19. Click a line number, then drag down the gutter: whole lines are selected.
-20. Drag the border between the tree and the editor, and between the editor and the AI pane: both resize.
+20. Drag the border between the tree and the editor, and between the editor and the AI pane: both resize. The divider is a plain coloured column (the same in Windows Terminal), dim orange under the mouse and orange while dragging.
+20b. Open a file longer than the screen with one very long line: a scrollbar thumb on the editor's right edge, and one under the text while the long line is on screen. Drag the bottom thumb: the text scrolls sideways, the cursor stays put ("Ln, Col" unchanged); any key brings it back. Scroll down past the long line: the bottom bar goes. Expand a folder with more files than fit in a narrow tree: the tree gets a thumb on its right and one along its bottom; dragging each scrolls the rows.
 21. Tabs: × closes, middle-click closes, a dirty tab asks first, and the wheel over the tab bar cycles.
 22. Right-click inside a selection, choose Copy, and paste in another app: the text matches, including non-ASCII.
 23. Ctrl+V pastes text copied in another app.

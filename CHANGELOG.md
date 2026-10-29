@@ -6,10 +6,15 @@ All notable changes to copane are listed here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Scrolling the editor sideways (Shift+wheel, a tilt wheel) sticks: the native view used to scroll back to the cursor's column on the next frame. The cursor now stays where it is, as it does when the wheel scrolls it off screen vertically, and comes back on the next key.
 - **A state folder copane can't write is reported.** When `~/.local/state` (or `$XDG_STATE_HOME`) isn't writable, for example a folder a `sudo` run left owned by root, recent folders, pane widths and backups of unsaved work were silently not kept. A notice at startup now says so, with the `chown` command that fixes it.
 - Khmer (and other scripts with subscript letters and spacing vowel signs) shows every letter and no longer runs past the editor into the next pane: ce now measures each letter and sign as one cell, as Windows Terminal and xterm.js draw them. The widest letters (ឃ ញ ឈ ណ ឍ យ ល ស ហ ឤ) get a spare cell when no sign follows them, so they no longer draw over the next letter. This takes a patch to OpenTUI's native library; building from source now needs Zig 0.16.0 and `bun run native`.
 
+### Added
+- **Scrollbars** on the editor and the file tree: one on the right when the lines don't fit, one along the bottom when a line on screen is wider than the pane. The thumb drags and the track clicks, so both panes scroll sideways in Windows Terminal, which sends neither Shift+wheel nor a tilt wheel. They disappear when everything fits.
+
 ### Changed
+- The pane dividers are coloured columns instead of a line glyph, so they look the same in every terminal and font (Windows Terminal draws box-drawing characters its own way), and they light up under the mouse before you drag.
 - The AI pane draws on the theme's background and text colours instead of the terminal's own, so it matches the editor in any terminal (a light one included). The emulator gets them as OSC 10/11, so a CLI that asks for the background colour (Claude Code picks its look from it) gets the theme's, and they're set again after a program resets them.
 - OpenTUI 0.7.0: typing in big files lays out only the changed lines.
 - Every diff shows in OpenTUI's diff view, with syntax colours, line numbers, and added and removed lines on a coloured background: Source control, the change peek (Alt+H), file and commit history, "Compare" (a file changed on disk), the AI turns view (Ctrl+Alt+Z) and an agent's merge review. History shows each file of a commit under its own header.

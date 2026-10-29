@@ -8,7 +8,9 @@ import { AiReviewBar } from "./AiReviewBar"
 import { setConflicts } from "../git/conflictActions"
 import { ControlCharsBar, MergeConflictBar } from "./ConflictBar"
 import "./CodeEditorRenderable"
-import { lineAt, type CodeEditorRenderable, type LayerHighlight } from "./CodeEditorRenderable"
+import type { ScrollbarRenderable } from "../app/Scrollbar"
+import "../app/Scrollbar"
+import { lineAt, type CodeEditorRenderable, type LayerHighlight, type ScrollState } from "./CodeEditorRenderable"
 import { useBuffers, useUi, useWorkspace, useCursorStyle, useKeyText } from "../app/workspace"
 import { ui as colors } from "../config/theme"
 import type { Buffer } from "./BufferStore"
@@ -123,11 +125,33 @@ function BufferViewInner({ buf, active, focused, wrap }: BufferViewProps) {
   const activeRef = useRef(active)
   activeRef.current = active
   const stale = useRef(false)
+  // The scrollbars follow the view: set straight on the renderables after each frame that moved it.
+  const vbar = useRef<ScrollbarRenderable | null>(null)
+  const hbar = useRef<ScrollbarRenderable | null>(null)
+  const syncBars = useCallback((s: ScrollState) => {
+    const v = vbar.current
+    if (v && !v.isDestroyed) {
+      v.viewportSize = s.height
+      v.scrollSize = s.lines
+      v.scrollPosition = s.y
+    }
+    const hb = hbar.current
+    const ed = editorRef.current
+    const ln = lineRef.current
+    if (hb && !hb.isDestroyed) {
+      // Under the text, not the line numbers.
+      hb.marginLeft = ed && ln ? Math.max(0, ed.x - ln.x) : 0
+      hb.viewportSize = s.width
+      hb.scrollSize = s.cols
+      hb.scrollPosition = s.x
+    }
+  }, [])
   const ref = useCallback(
     (r: CodeEditorRenderable | null) => {
       editorRef.current = r
       ws.buffers.attach(id, r as TextareaRenderable | null)
       if (r) {
+        r.onScroll = syncBars
         r.autoIndent = ws.config.editor.autoIndent
         r.autoClosingBrackets = ws.config.editor.autoClosingBrackets
         r.smoothScroll = ws.config.editor.smoothScrolling
@@ -466,63 +490,84 @@ function BufferViewInner({ buf, active, focused, wrap }: BufferViewProps) {
     decorateCursor()
   }, [ws, id, decorateCursor])
 
+  const track = { backgroundColor: colors.bg, foregroundColor: colors.scrollThumb }
   return (
-    <line-number
-      ref={lineRef}
-      visible={active}
-      flexGrow={1}
-      minWidth={3}
-      paddingRight={1}
-      fg={colors.gutterFg}
-      bg={colors.gutterBg}
-      // Clicks on the gutter (not the text) select whole lines; dragging extends the range.
-      onMouseDown={(e) => {
-        const ed = editorRef.current
-        if (!ed || e.target === ed || e.button !== 0) return
-        e.stopPropagation()
-        e.preventDefault()
-        const line = ed.lineAtScreenY(e.y)
-        // A click on a change marker (the column right after the number) opens that change.
-        if (e.x === ed.x - 2 && (aiSigns.current.has(line) || gitSigns.current.has(line))) {
-          ws.ui.set({ focus: "editor", hunkPeek: { bufId: id, row: line, kind: aiSigns.current.has(line) ? "ai" : "git" } })
-          return
-        }
-        gutterAnchor.current = line
-        ed.selectLines(line, line)
-        ws.ui.set({ focus: "editor" })
-        ws.buffers.onCursorChange(id)
-      }}
-      onMouseDrag={(e) => {
-        const ed = editorRef.current
-        if (!ed || gutterAnchor.current === null) return
-        e.stopPropagation()
-        ed.selectLines(gutterAnchor.current, ed.lineAtScreenY(e.y))
-        ws.buffers.onCursorChange(id)
-      }}
-      onMouseUp={() => {
-        gutterAnchor.current = null
-      }}
-    >
-      <code-editor
-        cursorStyle={cursorStyle}
-        ref={ref}
-        flexGrow={1}
-        // The renderer handles `focused` for every element; extended elements just lack the typing.
-        {...({ focused } as object)}
-        wrapMode={wrap ? "word" : "none"}
-        // Select exactly what the cursor passed over (VS Code style), not the cell under it.
-        selectionOccupancy="boundary"
-        syntaxStyle={syntaxStyle}
-        backgroundColor={colors.bg}
-        focusedBackgroundColor={colors.bg}
-        textColor={colors.text}
-        focusedTextColor={colors.text}
-        selectionBg={colors.selectionBg}
-        cursorColor={colors.cursor}
-        onContentChange={onContent}
-        onCursorChange={onCursor}
+    <box visible={active} flexGrow={1} flexDirection="column">
+      <box flexGrow={1} flexDirection="row">
+        <line-number
+          ref={lineRef}
+          flexGrow={1}
+          minWidth={3}
+          paddingRight={1}
+          fg={colors.gutterFg}
+          bg={colors.gutterBg}
+          // Clicks on the gutter (not the text) select whole lines; dragging extends the range.
+          onMouseDown={(e) => {
+            const ed = editorRef.current
+            if (!ed || e.target === ed || e.button !== 0) return
+            e.stopPropagation()
+            e.preventDefault()
+            const line = ed.lineAtScreenY(e.y)
+            // A click on a change marker (the column right after the number) opens that change.
+            if (e.x === ed.x - 2 && (aiSigns.current.has(line) || gitSigns.current.has(line))) {
+              ws.ui.set({ focus: "editor", hunkPeek: { bufId: id, row: line, kind: aiSigns.current.has(line) ? "ai" : "git" } })
+              return
+            }
+            gutterAnchor.current = line
+            ed.selectLines(line, line)
+            ws.ui.set({ focus: "editor" })
+            ws.buffers.onCursorChange(id)
+          }}
+          onMouseDrag={(e) => {
+            const ed = editorRef.current
+            if (!ed || gutterAnchor.current === null) return
+            e.stopPropagation()
+            ed.selectLines(gutterAnchor.current, ed.lineAtScreenY(e.y))
+            ws.buffers.onCursorChange(id)
+          }}
+          onMouseUp={() => {
+            gutterAnchor.current = null
+          }}
+        >
+          <code-editor
+            cursorStyle={cursorStyle}
+            ref={ref}
+            flexGrow={1}
+            // The renderer handles `focused` for every element; extended elements just lack the typing.
+            {...({ focused } as object)}
+            wrapMode={wrap ? "word" : "none"}
+            // Select exactly what the cursor passed over (VS Code style), not the cell under it.
+            selectionOccupancy="boundary"
+            syntaxStyle={syntaxStyle}
+            backgroundColor={colors.bg}
+            focusedBackgroundColor={colors.bg}
+            textColor={colors.text}
+            focusedTextColor={colors.text}
+            selectionBg={colors.selectionBg}
+            cursorColor={colors.cursor}
+            onContentChange={onContent}
+            onCursorChange={onCursor}
+          />
+        </line-number>
+        {/* Scrollbars (hidden while the text fits): the thumb drags, for terminals without sideways wheel events. */}
+        <scrollbar
+          ref={vbar}
+          orientation="vertical"
+          width={1}
+          flexShrink={0}
+          trackOptions={track}
+          onChange={(y: number) => editorRef.current?.scrollTo(null, y)}
+        />
+      </box>
+      <scrollbar
+        ref={hbar}
+        orientation="horizontal"
+        height={1}
+        flexShrink={0}
+        trackOptions={track}
+        onChange={(x: number) => editorRef.current?.scrollTo(x, null)}
       />
-    </line-number>
+    </box>
   )
 }
 
