@@ -5,7 +5,7 @@
 #   $PREFIX/bin/copane                  launcher that restarts the editor after an update
 # ALIAS adds a short command like VS Code's `code` (default `ce`; ALIAS= to skip).
 # FONT=0 skips installing the bundled Nerd Font (used for file-tree icons) and the terminal setup; FONT=force redoes it
-# (otherwise a finished setup is remembered and skipped).
+# (otherwise a finished setup is remembered and skipped). NATIVE=0 skips the native Khmer patch.
 set -eu
 cd "$(dirname "$0")/.."
 PREFIX="${PREFIX:-$HOME/.local}"
@@ -14,7 +14,12 @@ BIN="$PREFIX/lib/copane/copane"
 LAUNCHER="$PREFIX/bin/copane"
 
 bun install --frozen-lockfile
-sh scripts/opentui-native.sh
+# NATIVE=0 keeps OpenTUI's own native library (no Khmer patch), e.g. to try a new OpenTUI first.
+if [ "${NATIVE-1}" = 0 ]; then
+  echo "OpenTUI native library: unpatched (NATIVE=0); Khmer clusters lose letters"
+else
+  sh scripts/opentui-native.sh
+fi
 bun run build
 mkdir -p "$PREFIX/bin" "$(dirname "$BIN")"
 

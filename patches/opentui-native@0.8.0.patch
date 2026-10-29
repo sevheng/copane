@@ -1,8 +1,8 @@
 diff --git a/packages/native/src/renderer.zig b/packages/native/src/renderer.zig
-index c52e606..61b26a8 100644
+index 72980aa..c1e5cd9 100644
 --- a/packages/native/src/renderer.zig
 +++ b/packages/native/src/renderer.zig
-@@ -3075,6 +3075,10 @@ pub const CliRenderer = struct {
+@@ -2608,6 +2608,10 @@ pub const CliRenderer = struct {
                              if (capabilities.explicit_width) {
                                  ansi.ANSI.explicitWidthOutput(writer, graphemeWidth, bytes) catch {};
                              } else {
@@ -14,7 +14,7 @@ index c52e606..61b26a8 100644
                                  if (capabilities.explicit_cursor_positioning) {
                                      const nextX = x + graphemeWidth;
 diff --git a/packages/native/src/terminal.zig b/packages/native/src/terminal.zig
-index 621a4ee..2c731c4 100644
+index da64594..d9318e4 100644
 --- a/packages/native/src/terminal.zig
 +++ b/packages/native/src/terminal.zig
 @@ -27,7 +27,9 @@ pub const Capabilities = struct {
@@ -29,7 +29,7 @@ index 621a4ee..2c731c4 100644
      program_status: bool = false,
  };
 diff --git a/packages/native/src/utf8.zig b/packages/native/src/utf8.zig
-index 2077ca9..ada8f82 100644
+index 1586b07..5105b5f 100644
 --- a/packages/native/src/utf8.zig
 +++ b/packages/native/src/utf8.zig
 @@ -399,6 +399,14 @@ pub inline fn isCombiningMark(bytes: []const u8) bool {
