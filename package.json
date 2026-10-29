@@ -1,6 +1,6 @@
 {
   "name": "copane",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "description": "Terminal code editor with an AI coding CLI (Claude Code by default) in a side pane",
   "license": "MIT",
   "repository": {

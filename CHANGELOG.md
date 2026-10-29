@@ -5,6 +5,8 @@ All notable changes to copane are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-10-30
+
 ### Fixed
 - **No more flicker in the AI pane.** Claude Code redraws its screen in pieces and marks each redraw as one update (synchronized output, `ESC [?2026h` … `l`); the pane now waits for the whole update before drawing it, as Windows Terminal, Ghostty and VS Code's terminal do, so it no longer shows half-drawn screens while Claude works. An update that never ends is drawn after 150 ms.
 - Scrolling the editor sideways (Shift+wheel, a tilt wheel) sticks: the native view used to scroll back to the cursor's column on the next frame. The cursor now stays where it is, as it does when the wheel scrolls it off screen vertically, and comes back on the next key.
@@ -272,7 +274,8 @@ First public release.
 - VS Code keys and settings import.
 - Release binaries for Linux and macOS (x64 and arm64), and a one-line installer.
 
-[Unreleased]: https://github.com/sevheng/copane/compare/v0.9.11...HEAD
+[Unreleased]: https://github.com/sevheng/copane/compare/v0.9.12...HEAD
+[0.9.12]: https://github.com/sevheng/copane/compare/v0.9.11...v0.9.12
 [0.9.11]: https://github.com/sevheng/copane/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/sevheng/copane/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/sevheng/copane/compare/v0.9.8...v0.9.9
