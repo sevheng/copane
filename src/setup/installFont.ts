@@ -5,14 +5,14 @@
  *
  * - WSL: installs the font for the current Windows user (no admin) and sets it as the default
  *   font in Windows Terminal, unless you picked another font there. Backs up settings.json.
- * - macOS / Linux: installs the font; picking it in your terminal is up to you.
+ * - macOS / Linux: installs the font and sets up the terminals found (terminals.ts).
  * - Turns on `tree.icons: "nerd"` in the editor config once the terminal uses a Nerd Font,
  *   unless you set tree.icons yourself.
  *
  * Every step is idempotent and only warns on failure.
  *
  * Test hooks: CE_FONT_WT_SETTINGS (use this settings.json, skip discovery),
- * CE_FONT_SKIP_INSTALL=1 (don't install font files).
+ * CE_FONT_SKIP_INSTALL=1 (don't install font files), CE_SETUP_PLATFORM=darwin|linux (that setup, even on WSL).
  */
 // mkdtemp: Bun has no temp-folder API.
 import { mkdtemp, rm } from "node:fs/promises"
@@ -20,6 +20,7 @@ import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { applyEdits, modify, parse, type ParseError } from "jsonc-parser"
 import { configPath } from "../config/load"
+import { configureTerminals } from "./terminals"
 import bold from "../../assets/fonts/CaskaydiaMonoNerdFont-Bold.ttf" with { type: "file" }
 import regular from "../../assets/fonts/CaskaydiaMonoNerdFont-Regular.ttf" with { type: "file" }
 
@@ -286,7 +287,8 @@ export async function main(): Promise<void> {
   const say = (s: string) => lines.push("  " + s)
   const skipInstall = Bun.env.CE_FONT_SKIP_INSTALL === "1"
   try {
-    if ((await isWsl()) || Bun.env.CE_FONT_WT_SETTINGS) {
+    const platform = Bun.env.CE_SETUP_PLATFORM || process.platform
+    if (!Bun.env.CE_SETUP_PLATFORM && ((await isWsl()) || Bun.env.CE_FONT_WT_SETTINGS)) {
       // Already set up (checked without PowerShell, which takes a second or more): nothing to do.
       if (!skipInstall && Bun.env.FONT !== "force" && (await setUpBefore())) {
         say("font: already set up (FONT=force copane --install-font redoes it)")
@@ -304,12 +306,17 @@ export async function main(): Promise<void> {
       if (font.startsWith("installed") || wt.lines.some((l) => l.includes("default font set") || l.includes("font switched"))) {
         say("ACTION: close every Windows Terminal window, then open it again to load the font (a new tab is not enough)")
       }
-    } else if (process.platform === "darwin") {
-      if (!skipInstall) say(`font: ${await installUnix(join(homedir(), "Library/Fonts"))}`)
-      say(`select "${FACE}" in your terminal's font settings, then set tree.icons to "nerd" (README, Icons)`)
     } else {
-      if (!skipInstall) say(`font: ${await installUnix(join(homedir(), ".local/share/fonts"), () => sh(["fc-cache", "-f"]))}`)
-      say(`select "${FACE}" in your terminal's font settings, then set tree.icons to "nerd" (README, Icons)`)
+      const mac = platform === "darwin"
+      if (!skipInstall) {
+        const font = mac
+          ? await installUnix(join(homedir(), "Library/Fonts"))
+          : await installUnix(join(homedir(), ".local/share/fonts"), () => sh(["fc-cache", "-f"]))
+        say(`font: ${font}`)
+      }
+      const terminals = await configureTerminals(mac)
+      terminals.forEach((t) => say(t.line))
+      if (terminals.some((t) => t.nerd)) say(await enableIcons())
     }
   } catch (err) {
     say(`font setup skipped: ${(err as Error).message}`)

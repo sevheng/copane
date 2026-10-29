@@ -48,11 +48,12 @@ import { windowFocus, windowFocused } from "./app/windowFocus"
 import pkg from "../package.json"
 import { setCmdReachable } from "./keymap/platform"
 import { showMacTip } from "./app/macTip"
+import { useItermProfile } from "./app/itermProfile"
 import { stateDirProblem } from "./app/stateDir"
 
 const USAGE = `Usage: copane [file|directory]   (no argument: the welcome page with recent folders; . opens this one)
        copane --upgrade        install the latest release
-       copane --install-font   install the bundled Nerd Font for file-tree icons
+       copane --install-font   install the bundled Nerd Font and set up your terminals for it
        copane --version
 
 Opens a terminal code editor with an AI CLI (default: claude) in a side pane.
@@ -92,6 +93,7 @@ const { config, warning } = await loadConfig()
 
 prepareTerminal()
 installSignalHandlers()
+await useItermProfile().catch(() => null)
 
 // SIGINT, SIGTERM and SIGHUP run copane's shutdown (installSignalHandlers), which saves work and then
 // destroys the renderer: OpenTUI must not destroy it first. It keeps the signals copane doesn't handle.

@@ -4,7 +4,7 @@
 # VERSION=v0.1.0 pins a release (default: latest). PREFIX defaults to ~/.local:
 #   $PREFIX/lib/copane/copane   the binary
 #   $PREFIX/bin/copane          launcher that restarts the editor after an update
-# ALIAS adds a short command (default `ce`; ALIAS= to skip). FONT=0 skips the bundled Nerd Font.
+# ALIAS adds a short command (default `ce`; ALIAS= to skip). FONT=0 skips the bundled Nerd Font and the terminal setup.
 # Update later with `copane --upgrade` (or run this again); open editors offer a restart.
 set -eu
 REPO="sevheng/copane"
@@ -93,7 +93,7 @@ case ":$PATH:" in
     echo "Note: $PREFIX/bin is not on your PATH. Add this line to ~/.zshrc or ~/.bashrc, then open a new shell:"
     echo "  export PATH=\"$PREFIX/bin:\$PATH\"" ;;
 esac
-# File-tree icons need a Nerd Font in the terminal: install the bundled one (FONT=0 skips).
+# Install the bundled Nerd Font and point the terminals at it (FONT=0 skips).
 if [ "${FONT-1}" != 0 ]; then
   "$BIN" --install-font || echo "Icons: font setup skipped"
 fi

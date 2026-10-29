@@ -4,7 +4,7 @@
 #   $PREFIX/lib/copane/copane   the binary
 #   $PREFIX/bin/copane                  launcher that restarts the editor after an update
 # ALIAS adds a short command like VS Code's `code` (default `ce`; ALIAS= to skip).
-# FONT=0 skips installing the bundled Nerd Font (used for file-tree icons); FONT=force redoes it
+# FONT=0 skips installing the bundled Nerd Font (used for file-tree icons) and the terminal setup; FONT=force redoes it
 # (otherwise a finished setup is remembered and skipped).
 set -eu
 cd "$(dirname "$0")/.."
@@ -46,7 +46,7 @@ if [ -n "$ALIAS" ]; then
     echo "Linked $target -> copane"
   fi
 fi
-# File-tree icons need a Nerd Font in the terminal: install the bundled one (FONT=0 skips).
+# Install the bundled Nerd Font and point the terminals at it (FONT=0 skips).
 if [ "${FONT-1}" != 0 ]; then
   "$BIN" --install-font || echo "Icons: font setup skipped"
 fi

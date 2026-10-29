@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/sevheng/copane/main/install.sh | sh
 ```
 
 This installs `copane` and a short `ce` alias in `~/.local/bin`, plus the bundled Nerd Font for file-tree icons. No Bun or Node needed.
-`VERSION=v0.1.0` pins a release, `PREFIX=/usr/local` installs elsewhere, `ALIAS=cx` (or `ALIAS=`) changes the alias, and `FONT=0` skips the font.
+`VERSION=v0.1.0` pins a release, `PREFIX=/usr/local` installs elsewhere, `ALIAS=cx` (or `ALIAS=`) changes the alias, and `FONT=0` skips the font and terminal setup.
 You can also download a binary from [Releases](https://github.com/sevheng/copane/releases/latest).
 
 You'll want [Claude Code](https://docs.claude.com/en/docs/claude-code) (`claude`) on your PATH, or set another CLI in the [config](#config).
@@ -408,9 +408,14 @@ Both install scripts set this up by running `copane --install-font`, which you c
   - **Editor:** `tree.icons` is set to `"nerd"`, unless you already set it.
   - Close every Windows Terminal window and open it again, once, to load the font. A new tab or a `ce` restart is not enough, because Windows Terminal reads fonts only when it starts.
   - **Mouse:** Windows Terminal passes the wheel on, but not Shift+wheel or a sideways tilt or swipe. Scroll sideways with the scrollbars (drag the thumb along the bottom of the editor or the tree).
-- **macOS and Linux:** the font is copied to `~/Library/Fonts` or `~/.local/share/fonts`. Choose "CaskaydiaMono Nerd Font" in your terminal, then set `tree.icons` to `"nerd"`.
-- **Skip it:** set `FONT=0` when installing. Once the font is set up, later installs skip this step; `FONT=force copane --install-font` redoes it.
-- **Undo:** set `tree.icons` to `"simple"`, or restore the `settings.json.bak-…` file in Windows Terminal's settings folder.
+- **macOS and Linux:** the font is copied to `~/Library/Fonts` or `~/.local/share/fonts`, and the terminals found are set up so copane looks and takes keys the same as everywhere else. A config file is backed up next to itself before it changes, and a font you chose is left alone:
+  - **Terminal.app:** the default profile's font, when it is still a stock font (SF Mono, Menlo, Monaco) and Terminal is open. Turn on Settings › Profiles › Keyboard › Use Option as Meta key yourself: it can't be set from outside.
+  - **iTerm2:** a "copane" profile (the font, left Option as Esc+) on top of your default profile. copane switches its tab to it while it runs and back on exit; delete `~/Library/Application Support/iTerm2/DynamicProfiles/copane.json` to turn that off.
+  - **Ghostty, kitty:** `font-family` / `font_family`, and Option as Alt on a Mac, in their config files when not set there already.
+  - **GNOME Terminal:** the default profile's font, when it still follows the system font (at the same size).
+  - **Editor:** `tree.icons` is set to `"nerd"` once a terminal is set up, unless you already set it. In other terminals, choose "CaskaydiaMono Nerd Font" yourself.
+- **Skip it:** set `FONT=0` when installing. On WSL, once the font is set up, later installs skip this step; `FONT=force copane --install-font` redoes it.
+- **Undo:** set `tree.icons` to `"simple"`, or restore the `.bak-…` file next to the terminal's config (`settings.json` in Windows Terminal's settings folder).
 
 If icons show as boxes, your terminal isn't using a Nerd Font yet. On Windows, fully close and reopen Windows Terminal.
 
