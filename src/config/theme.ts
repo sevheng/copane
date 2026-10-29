@@ -60,6 +60,9 @@ export const syntaxTheme: Record<string, StyleDefinitionInput> = {
 export const ui = {
   bg: "#121212",
   panelBg: "#171717",
+  /** The AI pane's terminal: its default text and background (set in the emulator with OSC 10/11). */
+  aiFg: claude.text,
+  aiBg: "#121212",
   border: "#333333",
   borderFocused: claude.clay,
   text: claude.text,

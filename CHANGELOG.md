@@ -10,6 +10,7 @@ All notable changes to copane are listed here. The format follows
 - Khmer (and other scripts with subscript letters and spacing vowel signs) shows every letter and no longer runs past the editor into the next pane: ce now measures each letter and sign as one cell, as Windows Terminal and xterm.js draw them. The widest letters (ឃ ញ ឈ ណ ឍ យ ល ស ហ ឤ) get a spare cell when no sign follows them, so they no longer draw over the next letter. This takes a patch to OpenTUI's native library; building from source now needs Zig 0.16.0 and `bun run native`.
 
 ### Changed
+- The AI pane draws on the theme's background and text colours instead of the terminal's own, so it matches the editor in any terminal (a light one included). The emulator gets them as OSC 10/11, so a CLI that asks for the background colour (Claude Code picks its look from it) gets the theme's, and they're set again after a program resets them.
 - OpenTUI 0.7.0: typing in big files lays out only the changed lines.
 - Every diff shows in OpenTUI's diff view, with syntax colours, line numbers, and added and removed lines on a coloured background: Source control, the change peek (Alt+H), file and commit history, "Compare" (a file changed on disk), the AI turns view (Ctrl+Alt+Z) and an agent's merge review. History shows each file of a commit under its own header.
 - Smooth scrolling steps with the renderer's frames instead of its own timer.

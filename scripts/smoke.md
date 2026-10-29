@@ -40,6 +40,7 @@ Run in a real terminal, in plain mode and inside tmux.
 21. Tabs: × closes, middle-click closes, a dirty tab asks first, and the wheel over the tab bar cycles.
 22. Right-click inside a selection, choose Copy, and paste in another app: the text matches, including non-ASCII.
 23. Ctrl+V pastes text copied in another app.
+23b. Run `ce` in a terminal with a light or blue background: the AI pane is the editor's dark grey, not the terminal's colour, also after `! clear`, `! reset` and ↻ on a dev-server tab. `! printf '\e]11;?\a'` answers with the theme's background.
 24. Select text in the AI pane with the mouse: a "Copied" notice appears and the clipboard holds it.
 25. Ctrl+P, then hover, wheel and click in the list. Clicking outside the dialog closes it.
 26. Tree: right-click a row, New File, type `x/y.ts`: folder and file appear and the file opens.

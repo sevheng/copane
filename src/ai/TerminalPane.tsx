@@ -9,6 +9,7 @@ import { Store } from "../app/store"
 import { ui as colors } from "../config/theme"
 import { HoverBox } from "../app/Modal"
 import { cursorSequence, resetsCursorStyle } from "./cursorStyle"
+import { colorSequence, resetsColors } from "./terminalColors"
 import { runCommand } from "../keymap/commands"
 import { AgentProcess, type AgentStatus } from "./AgentProcess"
 import { GitRepo } from "../git/repo"
@@ -350,7 +351,6 @@ const AgentSession = memo(function AgentSession({
       height: "100%",
       flexGrow: 1,
       maxScrollback: config.maxScrollbackBytes,
-      transparentBackground: true,
       // Runs after the emulator forwards the click. When the CLI has mouse reporting on
       // (claude does), the emulator stops propagation, so the wrapper box never sees it.
       onMouseDown: (e) => {
@@ -373,7 +373,10 @@ const AgentSession = memo(function AgentSession({
       key.name === "linefeed" && key.eventType !== "release" && !key.ctrl && !key.meta && !key.option ? LINE_FEED : encodeKey(key)
     // The cursor shape of editor.cursorStyle (a thin line by default), until the program asks for another.
     const cursor = cursorSequence(ws.config.editor.cursorStyle)
-    term.write(cursor)
+    // The theme's text and background colours, not the terminal's own: the pane then matches the
+    // editor in any terminal. Set again when a program resets them (a full reset, OSC 110/111).
+    const palette = colorSequence(colors.aiFg, colors.aiBg)
+    term.write(palette + cursor)
     const run = session.terminal?.run ?? null
     // A terminal's recent output as text, scanned for errors once it settles.
     const output = session.terminal ? new OutputLines() : null
@@ -508,6 +511,7 @@ const AgentSession = memo(function AgentSession({
       onOutput: (data) => {
         if (disposed) return // the tab closed; the CLI is being stopped
         term.write(data)
+        if (resetsColors(data)) term.write(palette)
         if (resetsCursorStyle(data)) term.write(cursor)
         if (output) {
           output.push(data)
@@ -605,7 +609,7 @@ const AgentSession = memo(function AgentSession({
       },
       restart() {
         const again = () => {
-          term.write("\x1bc") // reset the emulator screen
+          term.write("\x1bc" + palette + cursor) // reset the emulator screen; the reset drops our colours and cursor
           output?.clear()
           setState(id, { error: null })
           void startProc()
@@ -655,7 +659,7 @@ const AgentSession = memo(function AgentSession({
     }
   }, [active, focused, ws, session.id])
 
-  return <box ref={boxRef} flexGrow={1} flexDirection="column" visible={active} />
+  return <box ref={boxRef} flexGrow={1} flexDirection="column" visible={active} backgroundColor={colors.aiBg} />
 })
 
 /**
