@@ -10,6 +10,7 @@ import { ui as colors } from "../config/theme"
 import { HoverBox } from "../app/Modal"
 import { cursorSequence, resetsCursorStyle } from "./cursorStyle"
 import { colorSequence, resetsColors } from "./terminalColors"
+import { SyncGate } from "./syncOutput"
 import { runCommand } from "../keymap/commands"
 import { AgentProcess, type AgentStatus } from "./AgentProcess"
 import { GitRepo } from "../git/repo"
@@ -504,15 +505,19 @@ const AgentSession = memo(function AgentSession({
       ticker = setInterval(tick, 500)
       ticker.unref?.()
     }
+    // A redraw reaches the emulator whole (synchronized output), so a frame never shows half of one.
+    const sync = new SyncGate((data) => {
+      term.write(data)
+      if (resetsColors(data)) term.write(palette)
+      if (resetsCursorStyle(data)) term.write(cursor)
+    })
     const proc = new AgentProcess({
       command: session.command,
       args: session.args,
       cwd: session.cwd,
       onOutput: (data) => {
         if (disposed) return // the tab closed; the CLI is being stopped
-        term.write(data)
-        if (resetsColors(data)) term.write(palette)
-        if (resetsCursorStyle(data)) term.write(cursor)
+        sync.push(data)
         if (output) {
           output.push(data)
           errorTimer ??= setTimeout(scanErrors, 300)
@@ -529,6 +534,7 @@ const AgentSession = memo(function AgentSession({
       },
       onStatus: (s) => {
         if (disposed) return
+        sync.flush() // the CLI's last output goes before copane's "exited" line
         // The command's name, not its path: the status bar has little room.
         setState(id, { status: describeStatus(name, s) })
         if (s.kind === "exited" && output) {
@@ -609,6 +615,7 @@ const AgentSession = memo(function AgentSession({
       },
       restart() {
         const again = () => {
+          sync.reset()
           term.write("\x1bc" + palette + cursor) // reset the emulator screen; the reset drops our colours and cursor
           output?.clear()
           setState(id, { error: null })
@@ -628,6 +635,7 @@ const AgentSession = memo(function AgentSession({
     return () => {
       // Output or an exit after this must not re-arm the ticker or alert about a closed tab.
       disposed = true
+      sync.reset()
       clearTimeout(startTimer)
       if (scanTimer) clearTimeout(scanTimer)
       if (errorTimer) clearTimeout(errorTimer)
