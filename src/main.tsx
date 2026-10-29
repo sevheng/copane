@@ -13,6 +13,7 @@ import {
 } from "./app/shutdown"
 import { restoreRecovery, saveRecovery } from "./app/recovery"
 import { useWideMarks } from "./app/widthMethod"
+import { useFrameRate } from "./app/frameRate"
 import { createWorkspace, WorkspaceContext } from "./app/workspace"
 import { pathArg } from "./app/args"
 import { forgetRecent, loadRecent, recordRecent } from "./app/recent"
@@ -102,6 +103,7 @@ const renderer = await createCliRenderer({
   exitSignals: ["SIGQUIT", "SIGABRT", "SIGPIPE", "SIGBREAK", "SIGBUS"],
 })
 useWideMarks(renderer)
+useFrameRate(renderer)
 registerRenderer(renderer)
 // Cmd keys only arrive from terminals that answer the kitty keyboard query (the reply comes later).
 setCmdReachable(!!renderer.capabilities?.kitty_keyboard)
