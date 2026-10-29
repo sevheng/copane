@@ -60,6 +60,9 @@ export const syntaxTheme: Record<string, StyleDefinitionInput> = {
 export const ui = {
   bg: "#121212",
   panelBg: "#171717",
+  /** The AI pane's terminal: its default text and background (set in the emulator with OSC 10/11). */
+  aiFg: claude.text,
+  aiBg: "#121212",
   border: "#333333",
   borderFocused: claude.clay,
   text: claude.text,
@@ -81,6 +84,8 @@ export const ui = {
   headerBg: "#171717",
   headerFg: claude.muted,
   divider: "#262626",
+  // The thumb of the editor's and the file tree's scrollbars (the track is the pane's background)
+  scrollThumb: "#3f3f3f",
   segmentBg: "#262626",
   accentDim: "#5a3a2e",
   currentLineBg: "#1b1b1b",

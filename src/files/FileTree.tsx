@@ -12,6 +12,7 @@ import { PaneHeader } from "../app/PaneHeader"
 import { DOUBLE_CLICK_MS, HoverBox } from "../app/Modal"
 import { safely } from "../app/safely"
 import { aiMarks, openAtFirstAiChange } from "../ai/review"
+import "../app/Scrollbar"
 
 const RIGHT = 2
 /** Columns a wheel notch scrolls the tree sideways. */
@@ -68,14 +69,16 @@ export function FileTree({
     0,
     rows.findIndex((r) => r.entry.path === tree.selected),
   )
-  // One row for the header.
-  const viewH = Math.max(1, height - (header ? 1 : 0))
+  // The rows' box: the pane less the header, and the horizontal scrollbar's row while it shows.
+  const [rowsH, setRowsH] = useState(0)
+  const viewH = Math.max(1, rowsH || height - (header ? 1 : 0))
   const maxTop = Math.max(0, rows.length - viewH)
   // Scroll offset is independent of the selection so the wheel can browse freely.
   const [topState, setTop] = useState(0)
   const top = Math.min(topState, maxTop)
   const [hovered, setHovered] = useState<string | null>(null)
-  // The pane's width: narrow trees indent less, and long names scroll sideways instead of being cut with "…".
+  // The rows' width (less the vertical scrollbar while it shows): narrow trees indent less, and
+  // long names scroll sideways instead of being cut with "…".
   const [width, setWidth] = useState(40)
   const indentW = width < 30 ? 1 : 2
   const [leftState, setLeft] = useState(0)
@@ -235,6 +238,7 @@ export function FileTree({
   const longest = Math.max(0, ...visible.map((r) => nameStart(r) + Bun.stringWidth(r.entry.name)))
   const maxLeft = Math.max(0, longest - avail)
   const left = Math.min(leftState, maxLeft)
+  const track = { backgroundColor: colors.panelBg, foregroundColor: colors.scrollThumb }
   /** Scroll sideways just enough that a row's name shows (all of it when it fits, else its start). */
   function showName(r: (typeof rows)[number]) {
     const start = nameStart(r)
@@ -255,9 +259,6 @@ export function FileTree({
       backgroundColor={colors.panelBg}
       overflow="hidden"
       ref={boxRef}
-      onSizeChange={function (this: { width: number }) {
-        setWidth(this.width)
-      }}
       onMouseDown={(e) => {
         ws.ui.set({ focus: "tree", sidebar: "files" })
         // Right-click on empty space: create at the project root.
@@ -304,96 +305,129 @@ export function FileTree({
           <TreeToolbar tree={tree} />
         </PaneHeader>
       ) : null}
-      {visible.map((r, i) => {
-        const idx = top + i
-        const isSel = idx === selectedIdx && tree.selected !== null
-        const isHover = drag ? false : hovered === r.entry.path
-        // While dragging: the folder the drop would go into, and what is in it.
-        const isDrop = drag?.to != null && (r.entry.path === drag.to || dirname(r.entry.path) === drag.to)
-        const icon = iconFor(r.entry.name, r.entry.isDir, r.expanded, icons)
-        // A folder icon shows open/closed itself; the arrow is only for styles without one.
-        const arrow = r.entry.isDir ? (icon ? "" : r.expanded ? "▾ " : "▸ ") : icons === "none" ? "  " : ""
-        const isActive = r.entry.path === activePath
-        const ignored = r.entry.ignored === true
-        const fg = isActive ? colors.accent : ignored ? colors.ignoredFg : r.entry.isDir ? colors.text : colors.dim
-        const mark = git ? (r.entry.isDir ? git.dirMark(r.entry.path) : git.mark(r.entry.path)) : null
-        // The active file keeps its accent; git colours everything else.
-        const gitColor = isActive ? null : markColor(mark)
-        const aiMark = r.entry.isDir ? (ai.dir(r.entry.path) ? "•" : null) : ai.file(r.entry.path)
-        return (
-          <box
-            key={r.entry.path}
-            height={1}
-            flexDirection="row"
-            paddingLeft={1}
-            backgroundColor={
-              isDrop
-                ? colors.selectionBg
-                : isSel
-                  ? focused
+      <box flexGrow={1} flexDirection="row" overflow="hidden">
+        <box
+          flexGrow={1}
+          flexDirection="column"
+          overflow="hidden"
+          onSizeChange={function (this: { width: number; height: number }) {
+            setWidth(this.width)
+            setRowsH(this.height)
+          }}
+        >
+          {visible.map((r, i) => {
+            const idx = top + i
+            const isSel = idx === selectedIdx && tree.selected !== null
+            const isHover = drag ? false : hovered === r.entry.path
+            // While dragging: the folder the drop would go into, and what is in it.
+            const isDrop = drag?.to != null && (r.entry.path === drag.to || dirname(r.entry.path) === drag.to)
+            const icon = iconFor(r.entry.name, r.entry.isDir, r.expanded, icons)
+            // A folder icon shows open/closed itself; the arrow is only for styles without one.
+            const arrow = r.entry.isDir ? (icon ? "" : r.expanded ? "▾ " : "▸ ") : icons === "none" ? "  " : ""
+            const isActive = r.entry.path === activePath
+            const ignored = r.entry.ignored === true
+            const fg = isActive ? colors.accent : ignored ? colors.ignoredFg : r.entry.isDir ? colors.text : colors.dim
+            const mark = git ? (r.entry.isDir ? git.dirMark(r.entry.path) : git.mark(r.entry.path)) : null
+            // The active file keeps its accent; git colours everything else.
+            const gitColor = isActive ? null : markColor(mark)
+            const aiMark = r.entry.isDir ? (ai.dir(r.entry.path) ? "•" : null) : ai.file(r.entry.path)
+            return (
+              <box
+                key={r.entry.path}
+                height={1}
+                flexDirection="row"
+                paddingLeft={1}
+                backgroundColor={
+                  isDrop
                     ? colors.selectionBg
-                    : colors.tabActiveBg
-                  : isHover
-                    ? colors.tabActiveBg
-                    : undefined
-            }
-            onMouseOver={() => setHovered(r.entry.path)}
-            onMouseOut={() => setHovered((h) => (h === r.entry.path ? null : h))}
-            onMouseDown={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              pressed.current = null
-              if (e.button === RIGHT) {
-                tree.select(r.entry.path)
-                ws.ui.set({ focus: "tree" })
-                openTreeMenu(ws, tree, r, e.x, e.y)
-              } else if (e.button === 0) {
-                tree.select(r.entry.path)
-                ws.ui.set({ focus: "tree", sidebar: "files" })
-                pressed.current = r.entry.path
-              }
-            }}
-            onMouseUp={(e) => {
-              // A release after a drag is the drop, not a click (drag-end already cleared `pressed`).
-              if (e.button !== 0 || pressed.current !== r.entry.path) return
-              pressed.current = null
-              e.stopPropagation()
-              clickRow(idx)
-            }}
-          >
-            <box flexGrow={1} flexShrink={1} overflow="hidden">
-              {/* One line, clipped at the pane's edge (no "…"); scrolled sideways by `left`. */}
-              <text
-                selectable={false}
-                wrapMode="none"
-                flexShrink={0}
-                marginLeft={-left}
-                fg={isSel && focused ? colors.text : (gitColor ?? fg)}
+                    : isSel
+                      ? focused
+                        ? colors.selectionBg
+                        : colors.tabActiveBg
+                      : isHover
+                        ? colors.tabActiveBg
+                        : undefined
+                }
+                onMouseOver={() => setHovered(r.entry.path)}
+                onMouseOut={() => setHovered((h) => (h === r.entry.path ? null : h))}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  pressed.current = null
+                  if (e.button === RIGHT) {
+                    tree.select(r.entry.path)
+                    ws.ui.set({ focus: "tree" })
+                    openTreeMenu(ws, tree, r, e.x, e.y)
+                  } else if (e.button === 0) {
+                    tree.select(r.entry.path)
+                    ws.ui.set({ focus: "tree", sidebar: "files" })
+                    pressed.current = r.entry.path
+                  }
+                }}
+                onMouseUp={(e) => {
+                  // A release after a drag is the drop, not a click (drag-end already cleared `pressed`).
+                  if (e.button !== 0 || pressed.current !== r.entry.path) return
+                  pressed.current = null
+                  e.stopPropagation()
+                  clickRow(idx)
+                }}
               >
-                {" ".repeat(r.depth * indentW)}
-                {arrow}
-                {icon ? <span fg={ignored ? colors.ignoredFg : icon.color}>{icon.glyph} </span> : null}
-                {r.entry.name}
-              </text>
-            </box>
-            {/* A blank cell after the mark: glyphs like ✎ draw wider than their cell, and the
+                <box flexGrow={1} flexShrink={1} overflow="hidden">
+                  {/* One line, clipped at the pane's edge (no "…"); scrolled sideways by `left`. */}
+                  <text
+                    selectable={false}
+                    wrapMode="none"
+                    flexShrink={0}
+                    marginLeft={-left}
+                    fg={isSel && focused ? colors.text : (gitColor ?? fg)}
+                  >
+                    {" ".repeat(r.depth * indentW)}
+                    {arrow}
+                    {icon ? <span fg={ignored ? colors.ignoredFg : icon.color}>{icon.glyph} </span> : null}
+                    {r.entry.name}
+                  </text>
+                </box>
+                {/* A blank cell after the mark: glyphs like ✎ draw wider than their cell, and the
                 pane's edge would cut them. */}
-            {aiMark ? (
-              <box width={3} flexShrink={0}>
-                <text selectable={false} fg={colors.aiEdit}>
-                  {` ${aiMark} `}
-                </text>
+                {aiMark ? (
+                  <box width={3} flexShrink={0}>
+                    <text selectable={false} fg={colors.aiEdit}>
+                      {` ${aiMark} `}
+                    </text>
+                  </box>
+                ) : mark ? (
+                  <box width={3} flexShrink={0}>
+                    <text selectable={false} fg={gitColor ?? colors.dim}>
+                      {r.entry.isDir ? " • " : ` ${mark} `}
+                    </text>
+                  </box>
+                ) : null}
               </box>
-            ) : mark ? (
-              <box width={3} flexShrink={0}>
-                <text selectable={false} fg={gitColor ?? colors.dim}>
-                  {r.entry.isDir ? " • " : ` ${mark} `}
-                </text>
-              </box>
-            ) : null}
-          </box>
-        )
-      })}
+            )
+          })}
+        </box>
+        {/* Scrollbars, hidden while everything fits; their thumbs drag (Windows Terminal sends no sideways wheel). */}
+        <scrollbar
+          orientation="vertical"
+          width={1}
+          flexShrink={0}
+          scrollSize={rows.length}
+          viewportSize={viewH}
+          scrollPosition={top}
+          trackOptions={track}
+          onChange={setTop}
+        />
+      </box>
+      <scrollbar
+        orientation="horizontal"
+        height={1}
+        flexShrink={0}
+        scrollSize={longest}
+        viewportSize={avail}
+        scrollPosition={left}
+        trackOptions={track}
+        onChange={setLeft}
+      />
     </box>
   )
 }

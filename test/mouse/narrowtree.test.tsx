@@ -40,8 +40,8 @@ test("Shift+wheel (or a sideways swipe) scrolls the rows sideways, as far as the
   const at = h!.find("b.ts")
   for (let i = 0; i < 10; i++) await h!.step(() => h!.mouse.scroll(at.x, at.y, "down", { modifiers: { shift: true } }))
   await until(() => row("filename.ts").includes("filename.ts"))
-  // No further than the end of the longest row: it ends right at the edge (before the marks' columns).
-  expect(row("filename.ts")).toMatch(/^ gfilename\.ts {3}│/)
+  // No further than the end of the longest row: it ends right at the edge (before the marks' columns and the divider).
+  expect(row("filename.ts")).toMatch(/^ gfilename\.ts {4}/)
   for (let i = 0; i < 10; i++) await h!.step(() => h!.mouse.scroll(at.x, at.y, "left"))
   await until(() => row("averyvery").includes("◆ averyvery"))
 })

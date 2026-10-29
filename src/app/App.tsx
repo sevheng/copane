@@ -63,11 +63,12 @@ function Divider({ side }: { side: "tree" | "ai" }) {
   const lastPress = useRef(0)
   const active = hover || ui.resizing === side
   return (
+    // A coloured column, not a line glyph: box-drawing characters differ between terminals and
+    // fonts (Windows Terminal draws its own), a cell's background looks the same everywhere.
     <box
       width={1}
       flexShrink={0}
-      border={["left"]}
-      borderColor={active ? colors.borderFocused : colors.divider}
+      backgroundColor={ui.resizing === side ? colors.borderFocused : hover ? colors.accentDim : colors.divider}
       onMouseOver={() => setHover(true)}
       onMouseOut={() => setHover(false)}
       onMouseDown={(e) => {

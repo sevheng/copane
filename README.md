@@ -147,7 +147,8 @@ With `"ai": { "notify": "desktop" }` you also get a system notification: a Windo
 
 ## Look
 
-- **Panes:** the panes have no boxes. A thin divider separates them: drag it to resize, double-click it to go back to the default width.
+- **Panes:** the panes have no boxes. A thin divider separates them (a coloured column, so it looks the same in every terminal and font): it lights up under the mouse, drag it to resize, double-click it to go back to the default width.
+- **Scrollbars:** the editor and the file tree show one on the right when there is more than fits, and one along the bottom when a line on screen is wider than the pane. Drag the thumb, or click the track. They disappear when everything fits.
 - **Headers:** each pane has one. The left pane has two tabs, `FILES` (the tree) and `SEARCH` (search and replace in all files); click one to switch. The editor's header is its tab row, with icons, and the active tab is accent-coloured while the editor has focus. The AI pane shows the command with `●` while it runs, or a spinner while it's working.
 - **Breadcrumbs:** under the tabs, `src › editor › EditorPane.tsx › BufferView` shows the folder path, the file and the symbol under the cursor. Click a folder to show it in the tree.
 - **Status bar,** left to right:
@@ -406,6 +407,7 @@ Both install scripts set this up by running `copane --install-font`, which you c
   - **Windows Terminal:** the font becomes its default. This only happens when no font is chosen there yet, or when an earlier install set "CaskaydiaMono Nerd Font Mono", which is switched to the new face. `settings.json` is backed up next to itself first.
   - **Editor:** `tree.icons` is set to `"nerd"`, unless you already set it.
   - Close every Windows Terminal window and open it again, once, to load the font. A new tab or a `ce` restart is not enough, because Windows Terminal reads fonts only when it starts.
+  - **Mouse:** Windows Terminal passes the wheel on, but not Shift+wheel or a sideways tilt or swipe. Scroll sideways with the scrollbars (drag the thumb along the bottom of the editor or the tree).
 - **macOS and Linux:** the font is copied to `~/Library/Fonts` or `~/.local/share/fonts`. Choose "CaskaydiaMono Nerd Font" in your terminal, then set `tree.icons` to `"nerd"`.
 - **Skip it:** set `FONT=0` when installing. Once the font is set up, later installs skip this step; `FONT=force copane --install-font` redoes it.
 - **Undo:** set `tree.icons` to `"simple"`, or restore the `settings.json.bak-…` file in Windows Terminal's settings folder.
@@ -414,12 +416,12 @@ If icons show as boxes, your terminal isn't using a Nerd Font yet. On Windows, f
 
 ## Mouse
 
-- **Editor:** click to place the cursor, drag to select, double-click selects a word. The wheel scrolls without moving the cursor, and Shift+wheel scrolls sideways.
+- **Editor:** click to place the cursor, drag to select, double-click selects a word. The wheel scrolls without moving the cursor, and Shift+wheel scrolls sideways. The scrollbar on the right and the one under the text (shown while a line on screen is wider than the pane) drag with the mouse too; they are the way to scroll sideways in Windows Terminal, which sends neither Shift+wheel nor a tilt wheel to programs.
 - **Line numbers:** click a number to select that line, drag to select several.
 - **Ctrl+click** (or Alt+click) a name to go to its definition.
 - **Right-click:** a menu with Go to definition, Find all references, Cut, Copy, Paste, Select all and Send to AI. In the AI pane there is no menu: right-click copies the selection, or pastes when nothing is selected.
-- **Panes:** clicking a pane focuses it. Drag the border between panes to resize them, and double-click it to reset that pane's width.
-- **Tree and picker:** the wheel scrolls, rows highlight on hover, and a click opens the file or toggles the folder. Right-click a tree row for file actions. In a narrow tree, long names are clipped at the edge: Shift+wheel (or a sideways swipe) scrolls the tree sideways.
+- **Panes:** clicking a pane focuses it. Drag the divider between panes to resize them (it lights up under the mouse), and double-click it to reset that pane's width.
+- **Tree and picker:** the wheel scrolls, rows highlight on hover, and a click opens the file or toggles the folder. Right-click a tree row for file actions. In a narrow tree, long names are clipped at the edge: Shift+wheel (or a sideways swipe) scrolls the tree sideways, and so does the scrollbar along the bottom; a scrollbar on the right appears when the rows don't fit.
 - **Tabs:** click to switch, click × or middle-click to close, wheel over the tab bar to cycle.
 - **Status bar:** the key hints are buttons, and clicking the AI status switches focus.
 - **Dialogs:** buttons are clickable, and clicking outside closes them. A dialog opened from another one (Source control's Discard question, Branches, History) goes back to it on Esc or a click outside.
