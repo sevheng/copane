@@ -58,6 +58,8 @@ export interface AgentTabs {
   newTerminal(): void
   /** The open tabs, saved by a restart to open again. */
   snapshot(): RestoreState["ai"]
+  /** Copy the visible tab's mouse selection; false when nothing is selected. */
+  copySelection(): boolean
   /** A terminal's error (the visible one's, else the newest), typed into the AI's prompt (not submitted). False when there is none. */
   sendTerminalError(): boolean
 }

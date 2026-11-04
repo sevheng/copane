@@ -5,8 +5,11 @@
  * (WSL) is set up there.
  *
  * - Ghostty, kitty: adds `font-family` / `font_family` (and Option as Alt on a Mac) to the config
- *   file, unless it sets them already. Both draw Nerd icons from a built-in font anyway.
- * - iTerm2: a dynamic profile named "copane" (the font, left Option as Esc+), on top of the default
+ *   file, unless it sets them already. Both draw Nerd icons from a built-in font anyway. On a Mac,
+ *   Ghostty's ⌘C copies only when Ghostty has a selection of its own, else it reaches copane (which
+ *   copies the editor's or the AI pane's selection).
+ * - iTerm2: a dynamic profile named "copane" (the font, left Option as Esc+, ⌘C / ⌘X sent to copane
+ *   as kitty-protocol keys, on top of the default profile's own key mappings), on top of the default
  *   profile; copane switches its tab to it while it runs (itermProfile.ts).
  * - Terminal.app: sets the font of the default profile, when it is still a stock font (SF Mono,
  *   Menlo, Monaco) and Terminal is running. Option as Meta can't be set from outside.
@@ -30,19 +33,37 @@ export interface Outcome {
   nerd: boolean
 }
 
+/** A line-based config setting: `key` names it, `match` (else the key at a line's start) finds it already set. */
+export interface Setting {
+  key: string
+  line: string
+  match?: RegExp
+}
+
 /** Add the `key value` settings a line-based config (Ghostty, kitty) doesn't set yet. */
-export function addSettings(text: string, settings: { key: string; line: string }[]): { text: string; added: string[] } {
-  const missing = settings.filter((s) => !new RegExp(`^\\s*${s.key}(\\s|=|$)`, "m").test(text))
+export function addSettings(text: string, settings: Setting[]): { text: string; added: string[] } {
+  const missing = settings.filter((s) => !(s.match ?? new RegExp(`^\\s*${s.key}(\\s|=|$)`, "m")).test(text))
   if (!missing.length) return { text, added: [] }
   const base = text && !text.endsWith("\n") ? text + "\n" : text
   const block = [MARK, ...missing.map((s) => s.line)].join("\n") + "\n"
   return { text: (base ? base + "\n" : "") + block, added: missing.map((s) => s.key) }
 }
 
-export function ghosttySettings(mac: boolean) {
+export function ghosttySettings(mac: boolean): Setting[] {
   return [
     { key: "font-family", line: `font-family = "${FACE}"` },
-    ...(mac ? [{ key: "macos-option-as-alt", line: "macos-option-as-alt = true" }] : []),
+    ...(mac
+      ? [
+          { key: "macos-option-as-alt", line: "macos-option-as-alt = true" },
+          // ⌘C copies Ghostty's own selection when there is one; otherwise copane gets it. A ⌘C
+          // binding of your own (with any prefix) is left alone.
+          {
+            key: "keybind super+c",
+            line: "keybind = performable:super+c=copy_to_clipboard",
+            match: /^\s*keybind\s*=\s*(?:[a-z_]+:)*super\+c\s*=/m,
+          },
+        ]
+      : []),
   ]
 }
 
@@ -53,8 +74,29 @@ export function kittySettings(mac: boolean) {
   ]
 }
 
-/** iTerm2 dynamic profile: fields it leaves out come from the default profile. */
-export function itermProfileJson(): string {
+/** iTerm2 key-map entries ("char-modifiers" in hex, 0x100000 = ⌘), as its profiles store them. */
+export type ItermKeyMap = Record<string, { Action: number; Text: string }>
+
+const ITERM_CMD = 0x100000
+const ITERM_SEND_ESCAPE = 10 // "Send Escape Sequence": ESC, then Text
+
+/**
+ * ⌘C / ⌘X as kitty-protocol keys (ESC [ code ; 9 u, 9 = 1 + Super), which iTerm2's menus would
+ * otherwise take: copane copies or cuts its own selection with them.
+ */
+export const ITERM_CMD_KEYS: ItermKeyMap = Object.fromEntries(
+  ["c", "x"].map((ch) => {
+    const code = ch.codePointAt(0)!
+    return [`0x${code.toString(16)}-0x${ITERM_CMD.toString(16)}`, { Action: ITERM_SEND_ESCAPE, Text: `[${code};9u` }]
+  }),
+)
+
+/**
+ * iTerm2 dynamic profile: fields it leaves out come from the default profile. A key map replaces
+ * the default's whole map, so `defaultKeys` (the default profile's own mappings) go in too; null
+ * (they couldn't be read) leaves the key map out, and ⌘C / ⌘X with iTerm2.
+ */
+export function itermProfileJson(defaultKeys: ItermKeyMap | null = {}): string {
   const profile = {
     Name: ITERM_PROFILE,
     Guid: "copane-dynamic-profile",
@@ -62,6 +104,7 @@ export function itermProfileJson(): string {
     "Non Ascii Font": `${PS_NAME} 13`,
     "Use Non-ASCII Font": false,
     "Option Key Sends": 2, // left Option: Esc+, so ⌥ shortcuts arrive as Alt
+    ...(defaultKeys ? { "Keyboard Map": { ...defaultKeys, ...ITERM_CMD_KEYS } } : {}),
   }
   return JSON.stringify({ Profiles: [profile] }, null, 2) + "\n"
 }
@@ -146,6 +189,32 @@ async function kitty(mac: boolean): Promise<Outcome | null> {
 
 export const itermProfilePath = () => join(homedir(), "Library/Application Support/iTerm2/DynamicProfiles/copane.json")
 
+/**
+ * The default profile's key mappings, from iTerm2's "New Bookmarks" (as `plutil -extract … json`
+ * prints it) and its "Default Bookmark Guid". Null when they can't be read.
+ */
+export function itermDefaultKeys(bookmarks: string, guid: string): ItermKeyMap | null {
+  try {
+    const profiles = JSON.parse(bookmarks) as { Guid?: string; "Keyboard Map"?: ItermKeyMap }[]
+    if (!Array.isArray(profiles)) return null
+    const def = profiles.find((b) => b.Guid === guid.trim()) ?? profiles[0]
+    return def ? (def["Keyboard Map"] ?? {}) : null
+  } catch {
+    return null
+  }
+}
+
+/** Read the default profile's key mappings; {} when iTerm2 has no preferences yet, null when unreadable. */
+async function readItermDefaultKeys(): Promise<ItermKeyMap | null> {
+  const plist = join(homedir(), "Library/Preferences/com.googlecode.iterm2.plist")
+  if (!(await exists(plist))) return {}
+  if (!runCommands()) return null
+  // Not the whole file: plutil can't turn its binary entries into JSON.
+  const bookmarks = await run(["plutil", "-extract", "New Bookmarks", "json", "-o", "-", plist])
+  const guid = (await run(["plutil", "-extract", "Default Bookmark Guid", "raw", "-o", "-", plist])) ?? ""
+  return bookmarks === null ? null : itermDefaultKeys(bookmarks, guid)
+}
+
 async function iterm(): Promise<Outcome | null> {
   const installed =
     (await exists("/Applications/iTerm.app/Contents/Info.plist")) ||
@@ -153,11 +222,13 @@ async function iterm(): Promise<Outcome | null> {
   if (!installed) return null
   try {
     const path = itermProfilePath()
-    const json = itermProfileJson()
+    const keys = await readItermDefaultKeys()
+    const json = itermProfileJson(keys)
     if ((await exists(path)) && (await Bun.file(path).text()) === json)
       return { line: `iTerm2: "${ITERM_PROFILE}" profile already set up`, nerd: true }
     await Bun.write(path, json)
-    return { line: `iTerm2: added the "${ITERM_PROFILE}" profile (copane switches to it while it runs)`, nerd: true }
+    const cmd = keys ? ", ⌘C / ⌘X go to copane" : "; ⌘C / ⌘X stay with iTerm2 (couldn't read its key mappings)"
+    return { line: `iTerm2: added the "${ITERM_PROFILE}" profile (copane switches to it while it runs${cmd})`, nerd: true }
   } catch (err) {
     return { line: `iTerm2: skipped (${(err as Error).message})`, nerd: false }
   }

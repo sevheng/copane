@@ -768,6 +768,7 @@ export function TerminalPane({ config, restored }: { config: AiConfig; restored?
       newTerminal: () => addSession(terminalSession(ws.root)),
       snapshot: snapshotAgentTabs,
       sendTerminalError: () => sendTerminalError(ws),
+      copySelection: () => copySelection(ws, tabs.get().active),
     }
     return () => {
       ws.ai = null
@@ -821,6 +822,17 @@ export function TerminalPane({ config, restored }: { config: AiConfig; restored?
       ))}
     </box>
   )
+}
+
+/** Copy a tab's selection (Cmd+C on a Mac: never the CLI's Ctrl+C). False when nothing is selected. */
+function copySelection(ws: Workspace, id: number): boolean {
+  const selected = terminalSelection(id)
+  if (!selected) return false
+  void ws.clipboard
+    .copy(selected)
+    .then(() => ws.notify(`Copied ${selected.length} chars`))
+    .catch((err: Error) => ws.notify(`Couldn't copy: ${err.message}`, "error"))
+  return true
 }
 
 /** Right-click in a tab: copy its selection, else paste the clipboard into it (agent or terminal). */

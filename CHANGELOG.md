@@ -5,6 +5,13 @@ All notable changes to copane are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **⌘C copies on a Mac.** In Ghostty and iTerm2, ⌘C used to copy the terminal's own selection, which is empty while copane has the mouse, so the editor's selection wasn't copied. `copane --install-font` now sets them up so ⌘C (and ⌘X in iTerm2) reach copane: Ghostty gets `keybind = performable:super+c=copy_to_clipboard` (it still copies a selection of its own), and the iTerm2 "copane" profile sends ⌘C / ⌘X to copane while keeping your default profile's key mappings.
+- **⌘C in the AI pane** copies the pane's selection and never reaches the CLI as Ctrl+C, so it can't interrupt Claude. With nothing selected it says so.
+
+### Changed
+- In a terminal that doesn't send ⌘ (Terminal.app), the first-start Mac notice now suggests Ghostty or iTerm2 for ⌘ shortcuts.
+
 ## [0.9.12] - 2026-10-30
 
 ### Fixed

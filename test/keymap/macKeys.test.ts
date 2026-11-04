@@ -30,6 +30,13 @@ test.each(CMD)("%s reaches its command on a Mac", (_name, bytes, command) => {
   expect(run(mac, ["editor", "global"], bytes)).toBe(command)
 })
 
+test("Cmd+C / Cmd+X reach copy and cut in the editor; in the AI pane Cmd+C copies, never the CLI's Ctrl+C", () => {
+  expect(run(mac, ["editor", "global"], "\x1b[99;9u")).toBe("edit.copy")
+  expect(run(mac, ["editor", "global"], "\x1b[120;9u")).toBe("edit.cut")
+  expect(lookup(mac.ai, key("\x1b[99;9u"))).toBe("ai.copySelection")
+  expect(lookup(mac.ai, "ctrl+c")).toBeUndefined()
+})
+
 test("Cmd works for Ctrl shortcuts off a Mac too (a Super key)", () => {
   expect(run(pc, ["editor", "global"], "\x1b[115;9u")).toBe("file.save")
 })
