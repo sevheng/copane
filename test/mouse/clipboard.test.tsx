@@ -3,7 +3,7 @@ import { MouseButtons } from "@opentui/core/testing"
 import type { Clipboard } from "../../src/app/clipboard"
 import { configSchema } from "../../src/config/schema"
 import { TerminalPane } from "../../src/ai/TerminalPane"
-import { createWorkspace, fixture, renderApp, type Harness } from "../helpers"
+import { createWorkspace, fixture, renderApp, type Harness, waitUntil } from "../helpers"
 
 let h: Harness | null = null
 afterEach(async () => {
@@ -136,6 +136,50 @@ test("AI pane: a mouse selection is copied on release", async () => {
   await hh.step(() => hh.mouse.drag(p.x, p.y, p.x + 6, p.y))
   await Bun.sleep(20)
   expect(state.copied.at(-1)).toBe("PICKME")
+})
+
+test("AI pane on a Mac: Cmd+C copies the selection and never interrupts the CLI", async () => {
+  const root = await fixture({})
+  const { cb, state } = fakeClipboard()
+  const ws = createWorkspace(root, { focus: "ai" }, configSchema.parse({ keyStyle: "mac" }), cb)
+  // Ctrl+C reaching the shell would print INTERRUPTED.
+  const script = "trap 'echo INTERRUPTED' INT; echo PICKME; while :; do sleep 0.05; done"
+  const hh = await renderApp(ws, {
+    ai: <TerminalPane config={{ command: "/bin/sh", args: ["-c", script], maxScrollbackBytes: 10000 }} />,
+  })
+  h = hh
+  await waitUntil(
+    () => hh.frame().includes("PICKME"),
+    3000,
+    () => hh.setup.renderOnce(),
+  )
+  // Nothing selected: a notice, nothing copied.
+  await hh.step(() => hh.keys.pressKey("\x1b[99;9u"))
+  expect(hh.frame()).toContain("Nothing selected")
+  expect(state.copied).toEqual([])
+  const p = hh.find("PICKME")
+  await hh.step(() => hh.mouse.drag(p.x, p.y, p.x + 6, p.y))
+  await waitUntil(
+    () => state.copied.length === 1,
+    3000,
+    () => hh.setup.renderOnce(),
+  )
+  // Cmd+C as a kitty-protocol terminal sends it.
+  await hh.step(() => hh.keys.pressKey("\x1b[99;9u"))
+  await waitUntil(
+    () => state.copied.length === 2,
+    3000,
+    () => hh.setup.renderOnce(),
+  )
+  expect(state.copied).toEqual(["PICKME", "PICKME"])
+  // A real Ctrl+C still goes to the CLI: proof the trap would have shown one.
+  await hh.step(() => hh.keys.pressKey("c", { ctrl: true }))
+  await waitUntil(
+    () => hh.frame().includes("INTERRUPTED"),
+    3000,
+    () => hh.setup.renderOnce(),
+  )
+  expect(hh.frame().match(/INTERRUPTED/g)?.length).toBe(1)
 })
 
 test("clicking interface labels (tabs, status bar) keeps the editor selection", async () => {

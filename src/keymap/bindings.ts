@@ -189,6 +189,10 @@ const macBindings: Partial<Record<Layer, Record<string, CommandId | null>>> = {
     "ctrl+e": "edit.lineEnd",
     "cmd+a": "edit.selectAll",
   },
+  ai: {
+    // ⌘C copies the pane's selection, as in any Mac terminal; it never reaches the CLI as Ctrl+C.
+    "cmd+c": "ai.copySelection",
+  },
 }
 
 export function buildBindings(

@@ -4,11 +4,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { FACE } from "../../src/setup/installFont"
 import {
+  ITERM_CMD_KEYS,
   ITERM_PROFILE,
   PS_NAME,
   addSettings,
   ghosttySettings,
   gnomeFont,
+  itermDefaultKeys,
   itermProfileJson,
   kittySettings,
 } from "../../src/setup/terminals"
@@ -16,10 +18,40 @@ import { useItermProfile } from "../../src/app/itermProfile"
 import { fontNames } from "../support/ttf"
 
 test("addSettings appends only the keys the config doesn't set", () => {
-  const r = addSettings("theme = dark\nmacos-option-as-alt = left\n", ghosttySettings(true))
+  const r = addSettings("theme = dark\nmacos-option-as-alt = left\n", ghosttySettings(false))
   expect(r.added).toEqual(["font-family"])
   expect(r.text).toBe(`theme = dark\nmacos-option-as-alt = left\n\n# Added by copane --install-font\nfont-family = "${FACE}"\n`)
+  expect(addSettings(r.text, ghosttySettings(false)).added).toEqual([])
+})
+
+test("Ghostty on a Mac: ⌘C copies Ghostty's own selection only, else reaches copane", () => {
+  const r = addSettings("keybind = super+k=unbind\n", ghosttySettings(true))
+  expect(r.added).toEqual(["font-family", "macos-option-as-alt", "keybind super+c"])
+  expect(r.text).toContain("\nkeybind = performable:super+c=copy_to_clipboard\n")
   expect(addSettings(r.text, ghosttySettings(true)).added).toEqual([])
+  // A ⌘C binding of your own, with or without a prefix, is left alone.
+  const own = `font-family = X\nmacos-option-as-alt = true\n`
+  expect(addSettings(own + "keybind = super+c=copy_to_clipboard\n", ghosttySettings(true)).added).toEqual([])
+  expect(addSettings(own + "keybind=global:super+c=paste_from_clipboard\n", ghosttySettings(true)).added).toEqual([])
+  expect(addSettings(own + "keybind = super+shift+c=x\n", ghosttySettings(true)).added).toEqual(["keybind super+c"])
+})
+
+test("iTerm2: ⌘C / ⌘X send kitty-protocol keys, on top of the default profile's own mappings", () => {
+  expect(ITERM_CMD_KEYS).toEqual({
+    "0x63-0x100000": { Action: 10, Text: "[99;9u" },
+    "0x78-0x100000": { Action: 10, Text: "[120;9u" },
+  })
+  const own = { "0xf702-0x300000": { Action: 11, Text: "0x1" } }
+  const bookmarks = JSON.stringify([
+    { Guid: "other", "Keyboard Map": {} },
+    { Guid: "G1", "Keyboard Map": own },
+  ])
+  expect(itermDefaultKeys(bookmarks, "G1\n")).toEqual(own)
+  expect(itermDefaultKeys(JSON.stringify([{ Guid: "x" }]), "")).toEqual({})
+  expect(itermDefaultKeys("not json", "G1")).toBeNull()
+  expect(JSON.parse(itermProfileJson(own)).Profiles[0]["Keyboard Map"]).toEqual({ ...own, ...ITERM_CMD_KEYS })
+  // Mappings that can't be read: no key map, so the default profile's stay in force.
+  expect(JSON.parse(itermProfileJson(null)).Profiles[0]["Keyboard Map"]).toBeUndefined()
 })
 
 test("addSettings: an empty config, a file without a last newline, kitty's spacing", () => {
@@ -84,8 +116,11 @@ test("macOS: Ghostty gets Option as Alt, iTerm2 gets the copane profile", () => 
   writeFileSync(join(dir, ".config/ghostty/config"), "")
   mkdirSync(join(dir, "Library/Application Support/iTerm2"), { recursive: true })
   const out = setup(dir, "darwin")
-  expect(out).toContain("Ghostty: set font-family, macos-option-as-alt")
-  expect(out).toContain(`iTerm2: added the "${ITERM_PROFILE}" profile`)
+  expect(out).toContain("Ghostty: set font-family, macos-option-as-alt, keybind super+c")
+  expect(readFileSync(join(dir, ".config/ghostty/config"), "utf8")).toContain("keybind = performable:super+c=copy_to_clipboard")
+  expect(out).toContain(
+    `iTerm2: added the "${ITERM_PROFILE}" profile (copane switches to it while it runs, ⌘C / ⌘X go to copane)`,
+  )
   expect(readFileSync(join(dir, "Library/Application Support/iTerm2/DynamicProfiles/copane.json"), "utf8")).toBe(
     itermProfileJson(),
   )

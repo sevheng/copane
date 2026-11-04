@@ -271,7 +271,8 @@ Rebind anything in `~/.config/copane/config.json` under `keys` (command names ar
 
 On a Mac, keys work the Mac way (`"keyStyle": "auto"`; `"mac"` or `"pc"` forces one):
 
-- **⌘ works for every Ctrl shortcut**: ⌘S, ⌘P, ⌘⇧P, ⌘F, ⌘Z / ⌘⇧Z, ⌘D, ⌘/, and the chords (⌘K ⌘C, ⌘K S…). ⌘A selects all, ⌘1–9 go to a tab, ⌘⇧[ / ⌘⇧] or ⌘⌥←/→ switch tabs. Ctrl keys keep working too.
+- **⌘ works for every Ctrl shortcut**: ⌘S, ⌘P, ⌘⇧P, ⌘F, ⌘C / ⌘X / ⌘V, ⌘Z / ⌘⇧Z, ⌘D, ⌘/, and the chords (⌘K ⌘C, ⌘K S…). ⌘A selects all, ⌘1–9 go to a tab, ⌘⇧[ / ⌘⇧] or ⌘⌥←/→ switch tabs. Ctrl keys keep working too.
+- **⌘C in the AI pane** copies its selection and never reaches the CLI, so it can't interrupt Claude. ⌃C still does.
 - **Text navigation**: ⌥←/→ jumps a word, ⌥⌫ deletes one, ⌘←/→ goes to the line's start (its indent first) and end, ⌘↑/↓ to the file's, ⌘⌫ deletes to the line's start. Add ⇧ to select.
 - **Moved for that**: back / forward are ⌃⌥←/→ (or ⌃- / ⌃⇧-, as in VS Code for Mac), and file blame is ⌥⇧B (⌥B is a word back in most Mac terminals).
 - **Labels**: the palette, the cheat sheet and notices show ⌘⇧P, not Ctrl+Shift+P.
@@ -280,10 +281,10 @@ A terminal only passes ⌘ to programs that ask for it with the kitty keyboard p
 
 | Terminal | ⌥ as Alt (needed for ⌥ shortcuts like ⌥N) | ⌘ shortcuts |
 | --- | --- | --- |
-| [Ghostty](https://ghostty.org) | `macos-option-as-alt = true` | Yes. Ghostty keeps ⌘C/⌘V (copy and paste work as usual), ⌘K, ⌘D, ⌘F, ⌘W, ⌘T and ⌘1–9 for itself; free the ones you want with `keybind = super+k=unbind` (one line each) |
+| [Ghostty](https://ghostty.org) | `macos-option-as-alt = true` | Yes. For ⌘C to copy copane's selection, add `keybind = performable:super+c=copy_to_clipboard` (`copane --install-font` does): Ghostty then copies only its own selection and passes ⌘C on otherwise. Ghostty keeps ⌘V (paste works as usual), ⌘K, ⌘D, ⌘F, ⌘W, ⌘T and ⌘1–9 for itself; free the ones you want with `keybind = super+k=unbind` (one line each) |
 | kitty, WezTerm | kitty: `macos_option_as_alt yes`; WezTerm: `send_composed_key_when_left_alt_is_pressed = false` | Yes, for keys not bound in their config |
-| iTerm2 | Profiles › Keys › Left Option key: Esc+ | Profiles › Keys: turn on "Apps can change how keys are reported"; ⌘ keys iTerm2's menus use stay with iTerm2 |
-| Terminal.app | Profiles › Keyboard › Use Option as Meta key | No: use the Ctrl keys (labels then show ⌃) |
+| iTerm2 | Profiles › Keys › Left Option key: Esc+ | Profiles › Keys: turn on "Apps can change how keys are reported"; ⌘ keys iTerm2's menus use stay with iTerm2, except ⌘C and ⌘X in the "copane" profile that `copane --install-font` adds |
+| Terminal.app | Profiles › Keyboard › Use Option as Meta key | No, and it can't be set up: use the Ctrl keys (labels then show ⌃), or Ghostty or iTerm2 for ⌘ |
 
 Ghostty and iTerm2 send ⌘←/→ and ⌘⌫ as the shell keys Ctrl+A / Ctrl+E / Ctrl+U, and ⌥←/→ as ESC b / ESC f; copane reads them as the Mac keys they stand for.
 
@@ -410,8 +411,8 @@ Both install scripts set this up by running `copane --install-font`, which you c
   - **Mouse:** Windows Terminal passes the wheel on, but not Shift+wheel or a sideways tilt or swipe. Scroll sideways with the scrollbars (drag the thumb along the bottom of the editor or the tree).
 - **macOS and Linux:** the font is copied to `~/Library/Fonts` or `~/.local/share/fonts`, and the terminals found are set up so copane looks and takes keys the same as everywhere else. A config file is backed up next to itself before it changes, and a font you chose is left alone:
   - **Terminal.app:** the default profile's font, when it is still a stock font (SF Mono, Menlo, Monaco) and Terminal is open. Turn on Settings › Profiles › Keyboard › Use Option as Meta key yourself: it can't be set from outside.
-  - **iTerm2:** a "copane" profile (the font, left Option as Esc+) on top of your default profile. copane switches its tab to it while it runs and back on exit; delete `~/Library/Application Support/iTerm2/DynamicProfiles/copane.json` to turn that off.
-  - **Ghostty, kitty:** `font-family` / `font_family`, and Option as Alt on a Mac, in their config files when not set there already.
+  - **iTerm2:** a "copane" profile (the font, left Option as Esc+, ⌘C and ⌘X sent to copane, your default profile's key mappings kept) on top of your default profile. copane switches its tab to it while it runs and back on exit; delete `~/Library/Application Support/iTerm2/DynamicProfiles/copane.json` to turn that off.
+  - **Ghostty, kitty:** `font-family` / `font_family`, and Option as Alt on a Mac, in their config files when not set there already. On a Mac, Ghostty also gets `keybind = performable:super+c=copy_to_clipboard`, unless you bound ⌘C yourself, so ⌘C copies copane's selection.
   - **GNOME Terminal:** the default profile's font, when it still follows the system font (at the same size).
   - **Editor:** `tree.icons` is set to `"nerd"` once a terminal is set up, unless you already set it. In other terminals, choose "CaskaydiaMono Nerd Font" yourself.
 - **Skip it:** set `FONT=0` when installing. On WSL, once the font is set up, later installs skip this step; `FONT=force copane --install-font` redoes it.

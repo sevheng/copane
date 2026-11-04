@@ -760,6 +760,12 @@ export const commands = {
   "ai.nextAgent": { title: "AI: next agent tab", run: (ws) => ws.agents?.cycle(1) },
   "ai.prevAgent": { title: "AI: previous agent tab", run: (ws) => ws.agents?.cycle(-1) },
   "ai.closeAgent": { title: "AI: close this agent tab", run: (ws) => ws.agents?.closeActive() },
+  "ai.copySelection": {
+    title: "AI pane: copy the selected text",
+    run: (ws) => {
+      if (!ws.agents?.copySelection()) ws.notify("Nothing selected: drag in the AI pane to select")
+    },
+  },
   "ai.turns": { title: "AI turns: review and undo what the AI changed", run: (ws) => ws.ui.set({ modal: { kind: "turns" } }) },
   "ai.newTerminal": { title: "Terminal: new terminal tab (your shell, in the AI pane)", run: (ws) => ws.agents?.newTerminal() },
   "ai.run": { title: "Terminal: run a dev server (npm run dev, docker compose up…)", run: (ws) => ws.agents?.openRun() },
