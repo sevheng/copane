@@ -5,6 +5,8 @@ All notable changes to copane are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-11-04
+
 ### Added
 - **⌘C copies on a Mac.** In Ghostty and iTerm2, ⌘C used to copy the terminal's own selection, which is empty while copane has the mouse, so the editor's selection wasn't copied. `copane --install-font` now sets them up so ⌘C (and ⌘X in iTerm2) reach copane: Ghostty gets `keybind = performable:super+c=copy_to_clipboard` (it still copies a selection of its own), and the iTerm2 "copane" profile sends ⌘C / ⌘X to copane while keeping your default profile's key mappings.
 - **⌘C in the AI pane** copies the pane's selection and never reaches the CLI as Ctrl+C, so it can't interrupt Claude. With nothing selected it says so.
@@ -281,7 +283,8 @@ First public release.
 - VS Code keys and settings import.
 - Release binaries for Linux and macOS (x64 and arm64), and a one-line installer.
 
-[Unreleased]: https://github.com/sevheng/copane/compare/v0.9.12...HEAD
+[Unreleased]: https://github.com/sevheng/copane/compare/v0.9.13...HEAD
+[0.9.13]: https://github.com/sevheng/copane/compare/v0.9.12...v0.9.13
 [0.9.12]: https://github.com/sevheng/copane/compare/v0.9.11...v0.9.12
 [0.9.11]: https://github.com/sevheng/copane/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/sevheng/copane/compare/v0.9.9...v0.9.10
